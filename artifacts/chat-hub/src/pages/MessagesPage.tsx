@@ -1,6 +1,7 @@
 import { parseApiDate } from "@/lib/date";
 import { PageTransition } from '@/components/PageTransition';
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Navbar } from "@/components/Navbar";
 import { 
   useListConversations, 
@@ -544,6 +545,7 @@ function MessageBubble({
                       if (e.key === 'Escape') handleEditCancel();
                     }}
                     className="w-full bg-transparent border-0 outline-none resize-none text-sm leading-relaxed text-inherit placeholder:opacity-50 min-h-[40px] max-h-[120px]"
+                    dir="auto"
                     rows={2}
                   />
                   <div className="flex gap-1.5 justify-end">
@@ -565,7 +567,7 @@ function MessageBubble({
                 </div>
               ) : (
                 <>
-                  {msg.content && <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>}
+                  {msg.content && <p className="text-sm whitespace-pre-wrap break-words leading-relaxed" dir="auto">{msg.content}</p>}
                   {msg.attachmentUrl && (
                     <AttachmentPreview
                       url={`${import.meta.env.BASE_URL}api/storage${msg.attachmentUrl}`}
@@ -884,7 +886,7 @@ function AdminReadonlyChatThread({
                       {msg.isDeleted ? (
                         <p className="text-sm italic opacity-60">Сообщение удалено</p>
                       ) : (
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed" dir="auto">{msg.content}</p>
                       )}
                     </div>
                     <div className="flex items-center gap-1 mt-1">
@@ -911,17 +913,113 @@ function AdminReadonlyChatThread({
   );
 }
 
+function ImageLightbox({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
+    closeBtnRef.current?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key === 'Tab' && containerRef.current) {
+        const focusables = containerRef.current.querySelectorAll<HTMLElement>(
+          'button, a[href]'
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+      previouslyFocused.current?.focus();
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      ref={containerRef}
+      className="fixed inset-0 z-[999] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8 animate-in fade-in duration-200"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={name}
+    >
+      <button
+        ref={closeBtnRef}
+        onClick={onClose}
+        aria-label="Close"
+        className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors z-10"
+      >
+        <X className="w-5 h-5" />
+      </button>
+      <a
+        href={url}
+        download
+        target="_blank"
+        rel="noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        aria-label="Download"
+        className="absolute top-4 right-16 sm:top-6 sm:right-20 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors z-10"
+      >
+        <Download className="w-5 h-5" />
+      </a>
+      <img
+        src={url}
+        alt={name}
+        onClick={(e) => e.stopPropagation()}
+        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+      />
+    </div>,
+    document.body
+  );
+}
+
 function AttachmentPreview({ url, type, name, size, isMe }: { url: string, type: any, name: string, size: number | null, isMe: boolean }) {
   const displaySize = size ? `${(size / 1024 / 1024).toFixed(2)} MB` : '';
-  
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
   if (type === 'image') {
     return (
-      <div className="mt-2 relative group w-full max-w-[16rem] rounded-xl overflow-hidden border border-black/10">
-        <img src={url} alt={name} className="w-full h-auto object-cover" />
-        <a href={url} download target="_blank" rel="noreferrer" className="absolute top-2 right-2 p-2 bg-black/50 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur">
-          <Download className="w-4 h-4" />
-        </a>
-      </div>
+      <>
+        <div className="mt-2 relative group w-full max-w-[16rem] rounded-xl overflow-hidden border border-black/10">
+          <button
+            type="button"
+            onClick={() => setLightboxOpen(true)}
+            aria-label={`${name} — открыть в полноэкранном режиме`}
+            className="block w-full cursor-zoom-in focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            <img
+              src={url}
+              alt={name}
+              className="w-full h-auto object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+            />
+          </button>
+          <a href={url} download target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="absolute top-2 right-2 p-2 bg-black/50 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur">
+            <Download className="w-4 h-4" />
+          </a>
+        </div>
+        {lightboxOpen && (
+          <ImageLightbox url={url} name={name} onClose={() => setLightboxOpen(false)} />
+        )}
+      </>
     );
   }
   

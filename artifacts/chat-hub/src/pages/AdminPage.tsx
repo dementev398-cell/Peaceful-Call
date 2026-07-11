@@ -4,9 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useLocation, Link } from 'wouter';
 import {
   useGetMe,
-  useListContent,
-  useUpsertContent,
-  useDeleteContent,
   useListMyPosts,
   useCreatePost,
   useUpdatePost,
@@ -33,7 +30,6 @@ import {
   useUpdateFaq,
   useDeleteFaq,
   useGetAdminStats,
-  type ContentItem,
   type PostAttachment,
   type FaqItem
 } from '@workspace/api-client-react';
@@ -61,7 +57,7 @@ import {
   Loader2, LogOut, Plus, Trash2, Edit2, Check, X,
   Mail, MailOpen, Reply, MessageCircle, Crown, Shield,
   ShieldAlert, LogIn, Users, Ban,
-  ChevronLeft, FileText, Settings, LayoutDashboard,
+  ChevronLeft, FileText, LayoutDashboard,
   ScrollText, Paperclip, Film, Camera, ShieldCheck, ShieldOff,
   Home, Eye, Maximize2, Minimize2, HelpCircle, ArrowUp, ArrowDown,
   MessagesSquare, Inbox
@@ -203,7 +199,7 @@ export default function AdminPage() {
 
   const isOwner = user.role === 'owner';
   const tabs = isOwner
-    ? ['dashboard', 'content', 'faq', 'posts', 'hadiths', 'messages', 'users', 'admins']
+    ? ['dashboard', 'faq', 'posts', 'hadiths', 'messages', 'users', 'admins']
     : ['dashboard', 'posts', 'hadiths', 'messages'];
 
   const roleLabel = isOwner
@@ -217,7 +213,7 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col gradient-bg">
       {/* ── Sticky Header ──────────────────────────────────────────────────────── */}
-      <header className="border-b border-primary/10 bg-card/70 backdrop-blur-xl sticky top-0 z-20 shadow-sm shadow-primary/5">
+      <header className="border-b border-white/5 bg-background/80 backdrop-blur-2xl sticky top-0 z-30 shadow-[0_4px_30px_-10px_rgba(0,0,0,0.5)]">
         {/* Mobile: two-row layout */}
         {isMobile ? (
           <div className="px-4 py-2 space-y-2">
@@ -294,36 +290,30 @@ export default function AdminPage() {
         )}
       </header>
 
-      <main className="flex-grow container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-6xl">
+      <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12 max-w-6xl flex flex-col w-full">
         <Tabs defaultValue={tabs[0]} className="w-full" dir="ltr">
           {/* Scrollable tabs strip */}
-          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 mb-6 sm:mb-8 pb-1">
-            <TabsList className="inline-flex bg-card/40 glass border border-border/30 p-1 sm:p-1.5 rounded-2xl gap-0.5 sm:gap-1 min-w-max shadow-inner">
-              <TabsTrigger value="dashboard" className="rounded-xl text-[11px] sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:glow-gold-sm whitespace-nowrap px-3 sm:px-4 py-2 sm:py-2.5 gap-1.5 sm:gap-2 transition-all font-semibold text-muted-foreground data-[state=active]:font-bold">
+          <div className="overflow-x-auto w-full mb-8 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 flex sm:justify-center scrollbar-none">
+            <TabsList className="inline-flex bg-card/30 backdrop-blur-xl border border-white/10 p-1.5 rounded-2xl gap-1 sm:gap-2 min-w-max shadow-2xl mx-auto">
+              <TabsTrigger value="dashboard" className="rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-primary/20 border border-transparent whitespace-nowrap px-4 py-2.5 gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
                 <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 {t('admin.dashboard')}
               </TabsTrigger>
               {isOwner && (
-                <TabsTrigger value="content" className="rounded-xl text-[11px] sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:glow-gold-sm whitespace-nowrap px-3 sm:px-4 py-2 sm:py-2.5 gap-1.5 sm:gap-2 transition-all font-semibold text-muted-foreground data-[state=active]:font-bold">
-                  <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  {t('admin.content')}
-                </TabsTrigger>
-              )}
-              {isOwner && (
-                <TabsTrigger value="faq" className="rounded-xl text-[11px] sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:glow-gold-sm whitespace-nowrap px-3 sm:px-4 py-2 sm:py-2.5 gap-1.5 sm:gap-2 transition-all font-semibold text-muted-foreground data-[state=active]:font-bold">
+                <TabsTrigger value="faq" className="rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-primary/20 border border-transparent whitespace-nowrap px-4 py-2.5 gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
                   <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   {t('admin.faq')}
                 </TabsTrigger>
               )}
-              <TabsTrigger value="posts" className="rounded-xl text-[11px] sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:glow-gold-sm whitespace-nowrap px-3 sm:px-4 py-2 sm:py-2.5 gap-1.5 sm:gap-2 transition-all font-semibold text-muted-foreground data-[state=active]:font-bold">
+              <TabsTrigger value="posts" className="rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-primary/20 border border-transparent whitespace-nowrap px-4 py-2.5 gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
                 <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 {t('admin.posts')}
               </TabsTrigger>
-              <TabsTrigger value="hadiths" className="rounded-xl text-[11px] sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:glow-gold-sm whitespace-nowrap px-3 sm:px-4 py-2 sm:py-2.5 gap-1.5 sm:gap-2 transition-all font-semibold text-muted-foreground data-[state=active]:font-bold">
+              <TabsTrigger value="hadiths" className="rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-primary/20 border border-transparent whitespace-nowrap px-4 py-2.5 gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
                 <ScrollText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 {t('admin.hadiths')}
               </TabsTrigger>
-              <TabsTrigger value="messages" className="rounded-xl text-[11px] sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:glow-gold-sm whitespace-nowrap px-3 sm:px-4 py-2 sm:py-2.5 gap-1.5 sm:gap-2 relative transition-all font-semibold text-muted-foreground data-[state=active]:font-bold">
+              <TabsTrigger value="messages" className="rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-primary/20 border border-transparent whitespace-nowrap px-4 py-2.5 gap-2 relative transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
                 <MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 {t('admin.messages')}
                 {unreadCount > 0 && (
@@ -333,13 +323,13 @@ export default function AdminPage() {
                 )}
               </TabsTrigger>
               {isOwner && (
-                <TabsTrigger value="users" className="rounded-xl text-[11px] sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:glow-gold-sm whitespace-nowrap px-3 sm:px-4 py-2 sm:py-2.5 gap-1.5 sm:gap-2 transition-all font-semibold text-muted-foreground data-[state=active]:font-bold">
+                <TabsTrigger value="users" className="rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-primary/20 border border-transparent whitespace-nowrap px-4 py-2.5 gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
                   <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   {t('admin.users')}
                 </TabsTrigger>
               )}
               {isOwner && (
-                <TabsTrigger value="admins" className="rounded-xl text-[11px] sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:glow-gold-sm whitespace-nowrap px-3 sm:px-4 py-2 sm:py-2.5 gap-1.5 sm:gap-2 transition-all font-semibold text-muted-foreground data-[state=active]:font-bold">
+                <TabsTrigger value="admins" className="rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-primary/20 border border-transparent whitespace-nowrap px-4 py-2.5 gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
                   <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   {t('admin.admins')}
                 </TabsTrigger>
@@ -347,35 +337,30 @@ export default function AdminPage() {
             </TabsList>
           </div>
 
-          <TabsContent value="dashboard" className="mt-0">
+          <TabsContent value="dashboard" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
             <DashboardManager isOwner={isOwner} />
           </TabsContent>
           {isOwner && (
-            <TabsContent value="content" className="mt-0">
-              <ContentManager />
-            </TabsContent>
-          )}
-          {isOwner && (
-            <TabsContent value="faq" className="mt-0">
+            <TabsContent value="faq" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
               <FaqManager />
             </TabsContent>
           )}
-          <TabsContent value="posts" className="mt-0">
+          <TabsContent value="posts" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
             <PostsManager />
           </TabsContent>
-          <TabsContent value="hadiths" className="mt-0">
+          <TabsContent value="hadiths" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
             <HadithsManager />
           </TabsContent>
-          <TabsContent value="messages" className="mt-0">
+          <TabsContent value="messages" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
             <MessagesManager userRole={user.role ?? 'editor'} />
           </TabsContent>
           {isOwner && (
-            <TabsContent value="users" className="mt-0">
+            <TabsContent value="users" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
               <UsersManager />
             </TabsContent>
           )}
           {isOwner && (
-            <TabsContent value="admins" className="mt-0">
+            <TabsContent value="admins" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
               <AdminsManager />
             </TabsContent>
           )}
@@ -474,11 +459,11 @@ function AdminAvatarWidget({ adminId }: { adminId: number }) {
 function SectionHeader({ icon: Icon, title, description }: { icon: React.ElementType; title: string; description?: string }) {
   return (
     <div className="flex items-start gap-3 mb-1">
-      <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+      <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-[0_0_15px_-3px_hsl(var(--primary)/0.2)]">
         <Icon className="w-4 h-4 text-primary" />
       </div>
       <div>
-        <h3 className="text-xl font-serif font-bold leading-tight">{title}</h3>
+        <h3 className="text-2xl font-serif font-bold leading-tight tracking-wide text-foreground/90">{title}</h3>
         {description && <p className="text-sm text-muted-foreground mt-0.5">{description}</p>}
       </div>
     </div>
@@ -489,7 +474,7 @@ function SectionHeader({ icon: Icon, title, description }: { icon: React.Element
 function StatusBadge({ published }: { published: boolean }) {
   const { t } = useLanguage();
   return published ? (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase tracking-widest border border-emerald-500/20 shadow-[0_0_10px_-2px_rgba(16,185,129,0.2)]">
       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
       {t('admin.published')}
     </span>
@@ -609,13 +594,13 @@ function UsersManager() {
       </div>
 
       {users.length === 0 ? (
-        <div className="text-center py-20 bg-card/40 border border-dashed border-border/50 rounded-2xl">
+        <div className="text-center py-20 bg-card/20 border border-dashed border-white/10 rounded-3xl">
           <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/20" />
           <p className="text-muted-foreground font-serif">{t('admin.noUsers')}</p>
         </div>
       ) : (
-        <div className="rounded-2xl border border-border/40 bg-card/30 overflow-hidden shadow-lg shadow-black/10">
-          <div className="px-4 py-3 border-b border-border/40 bg-muted/10 flex items-center justify-between">
+        <div className="rounded-3xl border border-white/5 bg-card/20 backdrop-blur-md overflow-hidden shadow-2xl">
+          <div className="px-5 py-4 border-b border-white/5 bg-white/5 flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5" />
               {t('admin.userMgmt')}
@@ -629,7 +614,7 @@ function UsersManager() {
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.03 }}
-                className={`flex items-center gap-3 px-4 py-3 transition-colors group ${
+                className={`flex items-start sm:items-center gap-3 px-4 py-3 sm:py-4 flex-col sm:flex-row transition-colors group ${
                   u.banned
                     ? 'bg-destructive/3 hover:bg-destructive/5'
                     : 'hover:bg-muted/20'
@@ -889,7 +874,7 @@ function MessagesManager({ userRole }: { userRole: string }) {
         )
       ) : (
         /* Desktop: side-by-side */
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[480px]">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 min-h-[480px]">
           {/* Inbox */}
           <div className="md:col-span-1 bg-card border border-border/50 rounded-2xl overflow-hidden flex flex-col shadow-lg shadow-black/10">
             <div className="px-4 py-3 border-b border-border/40 bg-muted/20">
@@ -969,19 +954,19 @@ function DashboardManager({ isOwner }: { isOwner: boolean }) {
       <SectionHeader icon={LayoutDashboard} title={t('admin.dashboard')} description={t('admin.dashboardDesc')} />
 
       {isError ? (
-        <div className="text-center py-16 bg-card/40 border border-dashed border-destructive/40 rounded-2xl">
+        <div className="text-center py-20 bg-card/20 border border-dashed border-destructive/30 rounded-3xl">
           <ShieldAlert className="w-10 h-10 mx-auto mb-3 text-destructive/50" />
           <p className="text-sm text-muted-foreground">{t('admin.statsError')}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
           {visible.map((c, idx) => (
             <motion.div
               key={c.key}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.04 }}
-              className="glass border border-border/40 rounded-2xl p-4 sm:p-5 shadow-lg shadow-black/10 hover:border-primary/30 hover:shadow-primary/5 transition-all group"
+              className="bg-card/30 backdrop-blur-md border border-white/5 rounded-3xl p-5 sm:p-6 shadow-2xl hover:bg-card/50 hover:border-primary/20 hover:shadow-[0_0_30px_-10px_hsl(var(--primary)/0.15)] transition-all duration-500 group"
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:glow-gold-sm transition-all">
@@ -1033,13 +1018,13 @@ function FaqLangEditor({ question, answer, onQuestion, onAnswer }: {
         })}
         <span className="text-[11px] text-muted-foreground ml-1">{t('admin.faqLangHint')}</span>
       </div>
-      <div dir={active === 'ar' ? 'rtl' : 'ltr'}>
+      <div>
         <label className="text-xs text-muted-foreground mb-1 block font-medium">{t('admin.faqQuestion')}</label>
-        <Input value={question[active] ?? ''} onChange={(e) => onQuestion({ ...question, [active]: e.target.value })} placeholder={t('admin.faqQuestionPlaceholder')} className="bg-background/50 h-9 text-sm" />
+        <Input dir="auto" value={question[active] ?? ''} onChange={(e) => onQuestion({ ...question, [active]: e.target.value })} placeholder={t('admin.faqQuestionPlaceholder')} className="bg-card/40 border-white/10 focus:border-primary/50 focus:ring-1 focus:ring-primary/50 h-10 text-sm transition-all" />
       </div>
-      <div dir={active === 'ar' ? 'rtl' : 'ltr'}>
+      <div>
         <label className="text-xs text-muted-foreground mb-1 block font-medium">{t('admin.faqAnswer')}</label>
-        <Textarea value={answer[active] ?? ''} onChange={(e) => onAnswer({ ...answer, [active]: e.target.value })} placeholder={t('admin.faqAnswerPlaceholder')} className="bg-background/50 min-h-[100px] resize-none text-sm rounded-xl" />
+        <Textarea dir="auto" value={answer[active] ?? ''} onChange={(e) => onAnswer({ ...answer, [active]: e.target.value })} placeholder={t('admin.faqAnswerPlaceholder')} className="bg-card/40 border-white/10 focus:border-primary/50 focus:ring-1 focus:ring-primary/50 min-h-[100px] resize-none text-sm rounded-xl transition-all" />
       </div>
     </div>
   );
@@ -1251,200 +1236,6 @@ function FaqManager() {
   );
 }
 
-// ── Content Manager ──────────────────────────────────────────────────────────
-function ContentManager() {
-  const { data: contentItems = [], isLoading, refetch } = useListContent();
-  const upsert = useUpsertContent();
-  const remove = useDeleteContent();
-  const { toast } = useToast();
-  const { t } = useLanguage();
-  const [editedItems, setEditedItems] = useState<Record<string, ContentItem>>({});
-  const [addingNew, setAddingNew] = useState(false);
-  const [newItem, setNewItem] = useState({ label: '', value: '', type: 'text' as const, group: 'Site' });
-  const [pendingDelete, setPendingDelete] = useState<ContentItem | null>(null);
-
-  if (isLoading) return <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
-
-  const grouped = contentItems.reduce((acc, item) => {
-    const g = item.group || 'General';
-    if (!acc[g]) acc[g] = [];
-    acc[g].push(item);
-    return acc;
-  }, {} as Record<string, ContentItem[]>);
-
-  const handleSave = async () => {
-    const itemsToSave = Object.values(editedItems);
-    if (itemsToSave.length === 0) return;
-    try {
-      await upsert.mutateAsync({ data: { items: itemsToSave } });
-      toast({ title: '✓', description: t('admin.saved') });
-      setEditedItems({});
-      await refetch();
-    } catch (error: any) {
-      toast({ title: t('admin.error'), description: error.message, variant: 'destructive' });
-    }
-  };
-
-  const handleAddNew = async () => {
-    if (!newItem.label || !newItem.value) {
-      toast({ title: t('admin.error'), description: t('admin.faqRequired'), variant: 'destructive' });
-      return;
-    }
-    const key = newItem.group.toLowerCase().replace(/\s+/g, '.') + '.' + newItem.label.toLowerCase().replace(/\s+/g, '_');
-    try {
-      await upsert.mutateAsync({ data: { items: [{ key, group: newItem.group, label: newItem.label, type: newItem.type, value: newItem.value }] } });
-      toast({ title: '✓', description: t('admin.saved') });
-      setNewItem({ label: '', value: '', type: 'text', group: 'Site' });
-      setAddingNew(false);
-      await refetch();
-    } catch (error: any) {
-      toast({ title: t('admin.error'), description: error.message, variant: 'destructive' });
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!pendingDelete) return;
-    const key = pendingDelete.key;
-    setPendingDelete(null);
-    try {
-      await remove.mutateAsync({ key });
-      toast({ title: '✓', description: t('admin.saved') });
-      await refetch();
-    } catch (error: any) {
-      toast({ title: t('admin.error'), description: error.message, variant: 'destructive' });
-    }
-  };
-
-  return (
-    <div className="space-y-7">
-      {pendingDelete && (
-        <ConfirmDialog
-          open={!!pendingDelete}
-          title={t('admin.delete')}
-          description={pendingDelete.label || pendingDelete.key}
-          confirmLabel={t('admin.delete')}
-          onConfirm={handleDelete}
-          onCancel={() => setPendingDelete(null)}
-        />
-      )}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <SectionHeader icon={Settings} title={t('admin.contentMgmt')} description={t('admin.contentDesc')} />
-        <div className="flex items-center gap-2">
-          {Object.keys(editedItems).length > 0 && (
-            <Button onClick={handleSave} disabled={upsert.isPending} className="rounded-full gap-2 text-sm h-9">
-              {upsert.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-              {t('admin.save')}
-            </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={() => setAddingNew(!addingNew)} className="rounded-full gap-1.5 text-xs h-9">
-            <Plus className="w-3.5 h-3.5" />
-            {t('admin.addNew')}
-          </Button>
-        </div>
-      </div>
-
-      {addingNew && (
-        <div className="bg-card border border-primary/20 rounded-2xl p-5 space-y-4 shadow-lg shadow-primary/5">
-          <h4 className="text-sm font-bold text-primary flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            {t('admin.addNew')}
-          </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block font-medium">{t('admin.fieldGroup')}</label>
-              <Input value={newItem.group} onChange={e => setNewItem({...newItem, group: e.target.value})} placeholder="Site" className="bg-background/50 h-9 text-sm" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block font-medium">{t('admin.fieldType')}</label>
-              <Select value={newItem.type} onValueChange={(v: any) => setNewItem({...newItem, type: v})}>
-                <SelectTrigger className="bg-background/50 h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="text">Text</SelectItem>
-                  <SelectItem value="textarea">Textarea</SelectItem>
-                  <SelectItem value="url">URL</SelectItem>
-                  <SelectItem value="image">Image URL</SelectItem>
-                  <SelectItem value="color">Color</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block font-medium">{t('admin.fieldKey')}</label>
-              <Input value={newItem.label} onChange={e => setNewItem({...newItem, label: e.target.value})} placeholder="Site Name" className="bg-background/50 h-9 text-sm" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block font-medium">{t('admin.fieldValue')}</label>
-              <Input value={newItem.value} onChange={e => setNewItem({...newItem, value: e.target.value})} placeholder="Peaceful Call" className="bg-background/50 h-9 text-sm" />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={handleAddNew} disabled={upsert.isPending} className="rounded-full gap-1.5 text-sm h-9">
-              {upsert.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-              {t('admin.addNew')}
-            </Button>
-            <Button variant="ghost" onClick={() => setAddingNew(false)} className="rounded-full text-sm h-9">
-              {t('admin.cancel')}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-7">
-        {Object.entries(grouped).map(([group, items]) => (
-          <div key={group} className="space-y-3">
-            <div className="flex items-center gap-3">
-              <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{group}</h4>
-              <div className="flex-1 h-px bg-border/40" />
-              <span className="text-xs text-muted-foreground">{items.length}</span>
-            </div>
-            <div className="space-y-2">
-              {items.map(item => {
-                const isEdited = editedItems[item.key] !== undefined;
-                const currentItem = isEdited ? editedItems[item.key] : item;
-                const handleChange = (val: string) => {
-                  setEditedItems(prev => ({ ...prev, [item.key]: { ...item, value: val } }));
-                };
-                return (
-                  <div key={item.key} className={`flex flex-col sm:flex-row gap-3 p-4 rounded-xl border items-start transition-all ${isEdited ? 'border-primary/30 bg-primary/4 shadow-sm shadow-primary/5' : 'border-border/40 bg-card/50 hover:border-border/70 hover:bg-card/80'}`}>
-                    <div className="w-full sm:w-1/3 flex flex-col justify-center min-w-0">
-                      <span className="text-sm font-medium text-foreground truncate">{item.label || item.key}</span>
-                      <span className="text-[10px] text-muted-foreground/60 font-mono truncate mt-0.5">{item.key}</span>
-                    </div>
-                    <div className="w-full sm:w-2/3 flex gap-2 min-w-0">
-                      <div className="flex-1 min-w-0">
-                        {item.type === 'textarea' ? (
-                          <Textarea value={currentItem.value} onChange={e => handleChange(e.target.value)} className="bg-background/50 min-h-[80px] resize-none text-sm rounded-xl" />
-                        ) : item.type === 'color' ? (
-                          <div className="flex items-center gap-2">
-                            <input type="color" value={currentItem.value} onChange={e => handleChange(e.target.value)} className="w-9 h-9 rounded-lg cursor-pointer bg-transparent border-0" />
-                            <Input value={currentItem.value} onChange={e => handleChange(e.target.value)} className="bg-background/50 font-mono text-sm h-9" />
-                          </div>
-                        ) : item.type === 'image' ? (
-                          <div className="space-y-2">
-                            <Input value={currentItem.value} onChange={e => handleChange(e.target.value)} className="bg-background/50 text-sm h-9" />
-                            {currentItem.value && (
-                              <div className="h-16 w-16 rounded-lg bg-muted border border-border overflow-hidden">
-                                <img src={currentItem.value} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <Input value={currentItem.value} onChange={e => handleChange(e.target.value)} className="bg-background/50 text-sm h-9" />
-                        )}
-                      </div>
-                      <Button variant="ghost" size="icon" onClick={() => setPendingDelete(item)} className="text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 flex-shrink-0 h-9 w-9 rounded-lg transition-all">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // ── Post Content Renderer (reused from SinglePostPage logic) ──────────────────
 function PostContentRenderer({ content, isRtl }: { content: string; isRtl: boolean }) {
@@ -1687,7 +1478,7 @@ function PostsManager() {
               </div>
             </div>
 
-            <div className="bg-card border border-border/40 rounded-2xl p-5 space-y-4 shadow-lg shadow-black/10">
+            <div className="bg-card/30 backdrop-blur-md border border-white/5 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('admin.title')}</label>
                 <Input value={editingPost.title || ''} onChange={e => setEditingPost({...editingPost, title: e.target.value})} className="bg-background/50 text-base font-serif h-10" />
@@ -1717,7 +1508,7 @@ function PostsManager() {
                   </div>
                 </div>
                 {coverMode === 'url' ? (
-                  <Input value={editingPost.coverImageUrl || ''} onChange={e => setEditingPost({...editingPost, coverImageUrl: e.target.value})} className="bg-background/50 text-sm h-9" placeholder="https://..." />
+                  <Input value={editingPost.coverImageUrl || ''} onChange={e => setEditingPost({...editingPost, coverImageUrl: e.target.value})} className="bg-card/40 border-white/10 focus:border-primary/50 focus:ring-1 focus:ring-primary/50 h-10 text-sm transition-all" placeholder="https://..." />
                 ) : (
                   <>
                     <input
@@ -1837,18 +1628,18 @@ function PostsManager() {
       </div>
 
       {posts.length === 0 ? (
-        <div className="text-center py-16 bg-card border border-dashed border-border/50 rounded-2xl">
+        <div className="text-center py-20 bg-card/20 border border-dashed border-white/10 rounded-3xl">
           <FileText className="w-10 h-10 mx-auto mb-3 text-muted-foreground/25" />
           <p className="text-muted-foreground font-serif text-base">{t('admin.noItems')}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {posts.map((post) => (
             <motion.div
               key={post.id}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-card border border-border/40 rounded-2xl overflow-hidden flex flex-col hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group card-hover"
+              className="bg-card/40 backdrop-blur-sm border border-white/5 rounded-3xl overflow-hidden flex flex-col hover:border-primary/30 hover:shadow-[0_8px_30px_-10px_hsl(var(--primary)/0.2)] hover:-translate-y-1 transition-all duration-500 group"
             >
               {resolvePostCover(post) ? (
                 <div className="h-36 overflow-hidden relative bg-muted">
@@ -1961,7 +1752,7 @@ function HadithsManager() {
           </Button>
         </div>
 
-        <div className="bg-card border border-border/40 rounded-2xl p-5 space-y-4 shadow-lg shadow-black/10">
+        <div className="bg-card/30 backdrop-blur-md border border-white/5 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('admin.hadithText')}</label>
             <Textarea value={editingHadith.text || ''} onChange={e => setEditingHadith({...editingHadith, text: e.target.value})} className="bg-background/50 min-h-[160px] font-serif text-base rounded-xl resize-y" />
@@ -1987,15 +1778,15 @@ function HadithsManager() {
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('admin.hadithNarrator')}</label>
-            <Input value={editingHadith.narrator || ''} onChange={e => setEditingHadith({...editingHadith, narrator: e.target.value})} className="bg-background/50 text-sm h-9" />
+            <Input value={editingHadith.narrator || ''} onChange={e => setEditingHadith({...editingHadith, narrator: e.target.value})} className="bg-card/40 border-white/10 focus:border-primary/50 focus:ring-1 focus:ring-primary/50 h-10 text-sm transition-all" />
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('admin.hadithSource')}</label>
-            <Input value={editingHadith.source || ''} onChange={e => setEditingHadith({...editingHadith, source: e.target.value})} className="bg-background/50 text-sm h-9" />
+            <Input value={editingHadith.source || ''} onChange={e => setEditingHadith({...editingHadith, source: e.target.value})} className="bg-card/40 border-white/10 focus:border-primary/50 focus:ring-1 focus:ring-primary/50 h-10 text-sm transition-all" />
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('admin.hadithTopic')}</label>
-            <Input value={editingHadith.topic || ''} onChange={e => setEditingHadith({...editingHadith, topic: e.target.value})} className="bg-background/50 text-sm h-9" />
+            <Input value={editingHadith.topic || ''} onChange={e => setEditingHadith({...editingHadith, topic: e.target.value})} className="bg-card/40 border-white/10 focus:border-primary/50 focus:ring-1 focus:ring-primary/50 h-10 text-sm transition-all" />
           </div>
         </div>
       </div>
@@ -2013,7 +1804,7 @@ function HadithsManager() {
       </div>
 
       {hadiths.length === 0 ? (
-        <div className="text-center py-16 bg-card border border-dashed border-border/50 rounded-2xl">
+        <div className="text-center py-20 bg-card/20 border border-dashed border-white/10 rounded-3xl">
           <ScrollText className="w-10 h-10 mx-auto mb-3 text-muted-foreground/25" />
           <p className="text-muted-foreground font-serif text-base">{t('admin.noItems')}</p>
         </div>
@@ -2025,7 +1816,7 @@ function HadithsManager() {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.04 }}
-              className="bg-card border border-border/40 rounded-2xl overflow-hidden flex flex-col hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group p-5 card-hover"
+              className="bg-card/40 backdrop-blur-sm border border-white/5 rounded-3xl overflow-hidden flex flex-col hover:border-primary/30 hover:shadow-[0_8px_30px_-10px_hsl(var(--primary)/0.2)] hover:-translate-y-1 transition-all duration-500 group p-5"
             >
               <span className={`inline-flex self-start px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border mb-3 ${GRADE_COLORS[hadith.grade] ?? 'bg-primary/10 text-primary border-primary/30'}`}>
                 {gradeLabel(hadith.grade)}
@@ -2198,8 +1989,8 @@ function AdminsManager() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-border/40 bg-card/30 overflow-hidden shadow-lg shadow-black/10">
-        <div className="px-4 py-3 border-b border-border/40 bg-muted/10 flex items-center justify-between">
+      <div className="rounded-3xl border border-white/5 bg-card/20 backdrop-blur-md overflow-hidden shadow-2xl">
+        <div className="px-5 py-4 border-b border-white/5 bg-white/5 flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             <Shield className="w-3.5 h-3.5" />
             {t('admin.admins')}
@@ -2217,7 +2008,7 @@ function AdminsManager() {
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.04 }}
-                className={`flex items-center gap-3 px-4 py-3.5 transition-colors group ${
+                className={`flex items-start sm:items-center gap-3 px-4 py-3.5 sm:py-4 flex-col sm:flex-row transition-colors group ${
                   isCurrentMe
                     ? 'bg-primary/4'
                     : 'hover:bg-muted/15'
