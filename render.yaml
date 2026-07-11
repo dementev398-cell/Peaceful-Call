@@ -1,14 +1,11 @@
 # ------------------------------------------------------------------------------
-# Single-service Render Blueprint for Peaceful Call.
+# Free-tier friendly Render Blueprint for Peaceful Call.
 # One Node/Express service builds and serves both the API and the React frontend.
-# The managed PostgreSQL database is declared here so Render provisions it once
-# and keeps it across every redeploy.
+# You must provide an external PostgreSQL database (e.g. Supabase, Neon) via
+# the DATABASE_URL env var. On free plans Render's managed Postgres is not
+# available, so migrations are run automatically at startup instead of in a
+# pre-deploy command.
 # ------------------------------------------------------------------------------
-
-databases:
-  - name: peaceful-call-db
-    plan: starter
-    region: frankfurt
 
 services:
   - type: web
@@ -19,22 +16,22 @@ services:
     buildCommand: >
       pnpm install --frozen-lockfile &&
       pnpm --filter @workspace/api-server --filter @workspace/chat-hub run build
-    startCommand: NODE_ENV=production node --enable-source-maps artifacts/api-server/dist/index.mjs
-    # Apply the Drizzle schema to the managed DB before each deploy goes live.
-    # `drizzle-kit push` is idempotent and additive-safe: it creates missing
-    # tables/columns without dropping existing data.
-    preDeployCommand: pnpm --filter @workspace/db run push
+    # Run migrations on every startup (drizzle-kit push is idempotent and safe
+    # for additive schema changes) then start the API. This avoids the paid
+    # pre-deploy command feature on Render.
+    startCommand: >
+      NODE_ENV=production pnpm --filter @workspace/db run push &&
+      NODE_ENV=production node --enable-source-maps artifacts/api-server/dist/index.mjs
     healthCheckPath: /api/healthz
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
-      # Auto-provided by the Render-managed database declared above.
+      # External PostgreSQL connection string (e.g. from Supabase or Neon).
+      # Format: postgres://user:password@host:port/database
       - key: DATABASE_URL
-        fromDatabase:
-          name: peaceful-call-db
-          property: connectionString
+        sync: false
       # Clerk production keys. The VITE-prefixed key is needed at build time
       # for the frontend; the non-VITE key is used by the backend.
       - key: CLERK_SECRET_KEY
