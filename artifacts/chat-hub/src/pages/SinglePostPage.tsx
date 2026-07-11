@@ -1,7 +1,7 @@
 import { parseApiDate } from "@/lib/date";
 import { PageTransition } from '@/components/PageTransition';
 import { useState } from 'react';
-import { useGetPostBySlug, useGetPostInteractions, useCreatePostComment, useDeletePostComment, useReactToPost, getGetPostInteractionsQueryKey, useGetMyProfile, getGetMyProfileQueryKey } from '@workspace/api-client-react';
+import { useGetPostBySlug, useGetPostInteractions, useCreatePostComment, useDeletePostComment, useReactToPost, getGetPostInteractionsQueryKey, useGetMyProfile, getGetMyProfileQueryKey, useGetMe } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'wouter';
 import { Navbar } from '@/components/Navbar';
@@ -124,6 +124,8 @@ function PostInteractions({ postId }: { postId: number }) {
   const { t, isRtl } = useLanguage();
   const { isSignedIn, user } = useAuth();
   const { data: myProfile } = useGetMyProfile({ query: { queryKey: getGetMyProfileQueryKey(), enabled: isSignedIn } });
+  const { data: me } = useGetMe();
+  const isAdmin = !!me && (me.role === 'owner' || me.role === 'editor');
   const queryClient = useQueryClient();
   const { data: interactions, isLoading } = useGetPostInteractions(postId, {
     query: { queryKey: getGetPostInteractionsQueryKey(postId), refetchInterval: 12000 } // poll every 12s for new comments from other users
@@ -318,17 +320,15 @@ function PostInteractions({ postId }: { postId: number }) {
                       </div>
                       <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">{comment.content}</p>
                     </div>
-                    {isSignedIn ? (
-                      comment.authorClerkId === user?.id ? (
-                        <button
-                          onClick={() => handleDelete(comment.id)}
-                          className="p-2 text-muted-foreground hover:text-destructive transition-colors rounded-lg hover:bg-destructive/10 flex-shrink-0"
-                          title={t('post.deleteComment')}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      ) : null
-                    ) : null}
+                    {isSignedIn && (comment.authorClerkId === user?.id || isAdmin) && (
+                      <button
+                        onClick={() => handleDelete(comment.id)}
+                        className="p-2 text-muted-foreground hover:text-destructive transition-colors rounded-lg hover:bg-destructive/10 flex-shrink-0"
+                        title={t('post.deleteComment')}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               ))}

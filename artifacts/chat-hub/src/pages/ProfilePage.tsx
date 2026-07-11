@@ -221,10 +221,6 @@ function CustomProfileSection() {
 
   const avatarSrc = profile.avatarUrl ? attachmentSrc(profile.avatarUrl) : '';
 
-  // Full name — only shown when it actually exists on the account
-  const hasFullName = !!user?.name?.trim();
-  const fullName = user?.name ?? '';
-
   return (
     <div className="glass rounded-[2rem] border border-border/30 p-8 shadow-xl">
       <div className="flex flex-col sm:flex-row gap-8 items-start">
@@ -345,19 +341,6 @@ function CustomProfileSection() {
             )}
           </div>
 
-          {/* Full name — only shown when the account has a name set */}
-          {hasFullName && (
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
-                {t('profile.fullNameLabel')}
-              </label>
-              <div className="flex items-center gap-3">
-                <span className="text-base font-sans text-foreground/90">{fullName}</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1.5">{t('profile.fullNameHint')}</p>
-            </div>
-          )}
-
           {/* Allow DMs toggle */}
           <div className="pt-2 border-t border-border/20">
             <div className="flex items-center justify-between gap-4">
@@ -407,10 +390,43 @@ function AccountManagementSection() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
 
+  const [fullName, setFullName] = useState('');
+  const [isChangingName, setIsChangingName] = useState(false);
+  const [isSubmittingName, setIsSubmittingName] = useState(false);
+
   const startEmailEdit = () => {
     setEmail(user?.email ?? '');
     setEmailPassword('');
     setIsChangingEmail(true);
+  };
+
+  const startNameEdit = () => {
+    setFullName(user?.name ?? '');
+    setIsChangingName(true);
+  };
+
+  const handleChangeName = async (e: FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingName(true);
+    try {
+      const res = await fetch(`${apiBase}/api/auth/change-name`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: fullName.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || t('profile.saveError'));
+      }
+      await refetch();
+      toast({ title: '✓', description: t('profile.fullNameSaved') });
+      setIsChangingName(false);
+    } catch (err) {
+      toast({ title: t('nickname.error'), description: err instanceof Error ? err.message : t('profile.saveError'), variant: 'destructive' });
+    } finally {
+      setIsSubmittingName(false);
+    }
   };
 
   const handleChangeEmail = async (e: FormEvent) => {
@@ -510,6 +526,50 @@ function AccountManagementSection() {
           <div className="flex items-center gap-3">
             <span className="text-base font-sans text-foreground/90">{user?.email}</span>
             <Button variant="outline" size="sm" onClick={startEmailEdit} className="rounded-full text-xs h-8 px-3">
+              {t('admin.edit')}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-border/20" />
+
+      {/* Full name (ФИО) */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <User className="w-4 h-4 text-primary" />
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            {t('profile.fullNameLabel')}
+          </label>
+        </div>
+
+        {isChangingName ? (
+          <form onSubmit={handleChangeName} className="space-y-3 max-w-sm">
+            <div className="space-y-2">
+              <Label className="text-xs">{t('profile.fullNameLabel')}</Label>
+              <Input
+                required
+                maxLength={120}
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="bg-background/50 border-primary/30 focus:border-primary/60 rounded-xl"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button type="submit" disabled={isSubmittingName || !fullName.trim()} className="rounded-full gap-2 text-sm h-9">
+                {isSubmittingName ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                {t('admin.save')}
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setIsChangingName(false)} className="rounded-full text-sm h-9">
+                {t('admin.cancel')}
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex items-center gap-3">
+            <span className="text-base font-sans text-foreground/90">{user?.name || t('profile.fullNameEmpty')}</span>
+            <Button variant="outline" size="sm" onClick={startNameEdit} className="rounded-full text-xs h-8 px-3">
               {t('admin.edit')}
             </Button>
           </div>

@@ -123,6 +123,7 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.fullNameLabel': 'ФИО',
     'profile.fullNameSaved': 'Имя обновлено',
     'profile.fullNameHint': 'Изменить имя можно через раздел учётной записи ниже.',
+    'profile.fullNameEmpty': 'Не указано',
     'profile.loadError': 'Не удалось загрузить профиль. Попробуйте ещё раз.',
     'profile.retry': 'Повторить',
     // Support
@@ -519,6 +520,7 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.fullNameLabel': 'Full Name',
     'profile.fullNameSaved': 'Name updated',
     'profile.fullNameHint': 'To change your name, use the account section below.',
+    'profile.fullNameEmpty': 'Not set',
     'profile.loadError': 'Failed to load profile. Please try again.',
     'profile.retry': 'Retry',
     // Support
@@ -915,6 +917,7 @@ const translations: Record<Language, Record<string, string>> = {
     'profile.fullNameLabel': 'الاسم الكامل',
     'profile.fullNameSaved': 'تم تحديث الاسم',
     'profile.fullNameHint': 'لتغيير اسمك، استخدم قسم الحساب أدناه.',
+    'profile.fullNameEmpty': 'غير محدد',
     'profile.loadError': 'فشل تحميل الملف الشخصي. يرجى المحاولة مرة أخرى.',
     'profile.retry': 'إعادة المحاولة',
     // Support

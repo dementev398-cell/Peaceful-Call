@@ -174,4 +174,33 @@ router.post("/auth/change-email", async (req, res): Promise<void> => {
   res.json(publicUser(updated));
 });
 
+const ChangeNameBody = z.object({
+  name: z.string().trim().min(1).max(120),
+});
+
+router.post("/auth/change-name", async (req, res): Promise<void> => {
+  const auth = getAuth(req);
+  if (!auth.userId) {
+    res.status(401).json({ error: "Not signed in" });
+    return;
+  }
+  const parsed = ChangeNameBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(usersTable)
+    .set({ name: parsed.data.name })
+    .where(eq(usersTable.id, Number(auth.userId)))
+    .returning();
+  if (!updated) {
+    res.status(401).json({ error: "Not signed in" });
+    return;
+  }
+
+  res.json(publicUser(updated));
+});
+
 export default router;
