@@ -815,6 +815,8 @@ export const ListChatMessagesResponseItem = zod.object({
   "attachmentMimeType": zod.string().nullish(),
   "attachmentSize": zod.number().nullish(),
   "isDeleted": zod.boolean(),
+  "isEdited": zod.boolean(),
+  "editedAt": zod.string().nullish(),
   "isForwarded": zod.boolean(),
   "forwardedFromSenderName": zod.string().nullish(),
   "createdAt": zod.string()
@@ -853,6 +855,8 @@ export const SendChatMessageResponse = zod.object({
   "attachmentMimeType": zod.string().nullish(),
   "attachmentSize": zod.number().nullish(),
   "isDeleted": zod.boolean(),
+  "isEdited": zod.boolean().optional(),
+  "editedAt": zod.string().nullish(),
   "isForwarded": zod.boolean(),
   "forwardedFromSenderName": zod.string().nullish(),
   "createdAt": zod.string()
@@ -883,6 +887,40 @@ export const DeleteChatMessageQueryParams = zod.object({
 })
 
 export const DeleteChatMessageResponse = zod.void()
+
+
+/**
+ * @summary Edit a chat message (sender only, text messages only)
+ */
+export const EditChatMessageParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const EditChatMessageBody = zod.object({
+  "content": zod.string().min(1)
+})
+
+export const EditChatMessageResponse = zod.object({
+  "id": zod.number(),
+  "conversationId": zod.number(),
+  "senderClerkId": zod.string(),
+  "senderName": zod.string(),
+  "senderNickname": zod.string().nullish(),
+  "senderAvatarUrl": zod.string().nullish(),
+  "senderIsAdmin": zod.enum(['true', 'false']),
+  "content": zod.string().nullish(),
+  "attachmentUrl": zod.string().nullish(),
+  "attachmentType": zod.union([zod.literal('image'),zod.literal('video'),zod.literal('file'),zod.literal(null)]).nullish(),
+  "attachmentName": zod.string().nullish(),
+  "attachmentMimeType": zod.string().nullish(),
+  "attachmentSize": zod.number().nullish(),
+  "isDeleted": zod.boolean(),
+  "isEdited": zod.boolean(),
+  "editedAt": zod.string().nullish(),
+  "isForwarded": zod.boolean(),
+  "forwardedFromSenderName": zod.string().nullish(),
+  "createdAt": zod.string()
+})
 
 
 /**

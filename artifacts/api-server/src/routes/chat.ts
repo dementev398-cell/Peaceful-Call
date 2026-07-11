@@ -22,6 +22,8 @@ import {
   SendChatMessageResponse,
   ListChatUsersResponse,
   ForwardChatMessageBody,
+  EditChatMessageBody,
+  EditChatMessageResponse,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -336,6 +338,8 @@ router.get(
             attachmentMimeType: null,
             attachmentSize: null,
             isDeleted: true,
+            isEdited: m.isEdited,
+            editedAt: m.editedAt ?? null,
             isForwarded: m.isForwarded,
             forwardedFromSenderName: m.forwardedFromSenderName ?? null,
             createdAt: m.createdAt,
@@ -357,6 +361,8 @@ router.get(
           attachmentMimeType: m.attachmentMimeType ?? null,
           attachmentSize: m.attachmentSize ?? null,
           isDeleted: false,
+          isEdited: m.isEdited,
+          editedAt: m.editedAt ?? null,
           isForwarded: m.isForwarded,
           forwardedFromSenderName: m.forwardedFromSenderName ?? null,
           createdAt: m.createdAt,
@@ -553,6 +559,91 @@ router.delete(
     }
 
     res.sendStatus(204);
+  },
+);
+
+// ── Edit message ─────────────────────────────────────────────────────────────
+// PATCH /chat/messages/:id
+// body: { content: string }
+// Sender only; does not allow editing deleted messages; text-only
+
+router.patch(
+  "/chat/messages/:id",
+  requireAppUser,
+  async (req, res): Promise<void> => {
+    const me = req.appUser!;
+    const messageId = parseInt(req.params.id as string, 10);
+
+    const parsed = EditChatMessageBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+
+    const [message] = await db
+      .select()
+      .from(chatMessagesTable)
+      .where(eq(chatMessagesTable.id, messageId));
+    if (!message) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+
+    // Only the original sender can edit
+    if (message.senderClerkId !== me.clerkUserId) {
+      res.status(403).json({ error: "Only the sender can edit this message" });
+      return;
+    }
+
+    // Cannot edit a deleted message
+    if (message.isDeleted) {
+      res.status(400).json({ error: "Cannot edit a deleted message" });
+      return;
+    }
+
+    // Verify participant in conversation
+    const [convo] = await db
+      .select()
+      .from(conversationsTable)
+      .where(eq(conversationsTable.id, message.conversationId));
+    if (!convo) {
+      res.status(404).json({ error: "Conversation not found" });
+      return;
+    }
+    const admin = await isAdmin(me.clerkUserId);
+    if (!(await canAccessConversation(convo, me.clerkUserId, admin))) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const [updated] = await db
+      .update(chatMessagesTable)
+      .set({
+        content: parsed.data.content,
+        isEdited: true,
+        editedAt: now,
+      })
+      .where(eq(chatMessagesTable.id, messageId))
+      .returning();
+
+    // Fetch profile for response
+    const [profile] = await db
+      .select()
+      .from(userProfilesTable)
+      .where(eq(userProfilesTable.clerkUserId, me.clerkUserId));
+
+    res.json(
+      EditChatMessageResponse.parse({
+        ...updated,
+        senderNickname: profile?.nickname ?? null,
+        isDeleted: updated.isDeleted,
+        isEdited: updated.isEdited,
+        editedAt: updated.editedAt ?? null,
+        isForwarded: updated.isForwarded,
+        forwardedFromSenderName: updated.forwardedFromSenderName ?? null,
+      }),
+    );
   },
 );
 
@@ -816,6 +907,8 @@ router.get(
           attachmentMimeType: null,
           attachmentSize: null,
           isDeleted: true,
+          isEdited: m.isEdited,
+          editedAt: m.editedAt ?? null,
           isForwarded: m.isForwarded,
           forwardedFromSenderName: m.forwardedFromSenderName ?? null,
           createdAt: m.createdAt,
@@ -837,6 +930,8 @@ router.get(
         attachmentMimeType: m.attachmentMimeType ?? null,
         attachmentSize: m.attachmentSize ?? null,
         isDeleted: false,
+        isEdited: m.isEdited,
+        editedAt: m.editedAt ?? null,
         isForwarded: m.isForwarded,
         forwardedFromSenderName: m.forwardedFromSenderName ?? null,
         createdAt: m.createdAt,

@@ -561,11 +561,21 @@ export interface ChatMessage {
   /** @nullable */
   attachmentSize?: number | null;
   isDeleted: boolean;
+  isEdited?: boolean;
+  /** @nullable */
+  editedAt?: string | null;
   isForwarded: boolean;
   /** @nullable */
   forwardedFromSenderName?: string | null;
   createdAt: string;
 }
+
+export interface EditChatMessageInput {
+  /** @minLength 1 */
+  content: string;
+}
+
+export type EditChatMessagePayload = ChatMessage;
 
 export type ListChatMessagesPayload = ChatMessage[];
 

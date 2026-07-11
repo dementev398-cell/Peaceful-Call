@@ -13,6 +13,18 @@
   display: none !important;
 }
 
+/* Fix low-contrast "ОСНОВНОЙ" / Primary badge in Clerk's UserProfile.
+   cl-badge is the stable Clerk class for inline email-primary / phone-primary labels.
+   We override it here (unlayered, beats the clerk css layer) with a clearly legible
+   gold-on-dark palette that matches the app's brand. */
+.cl-badge {
+  background-color: hsl(43 85% 58% / 0.18) !important;
+  color: hsl(43 85% 72%) !important;
+  border: 1px solid hsl(43 85% 58% / 0.35) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+}
+
 @theme inline {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));

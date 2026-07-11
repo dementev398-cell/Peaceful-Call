@@ -59,6 +59,9 @@ export const chatMessagesTable = pgTable("chat_messages", {
   // Deletion fields
   isDeleted: boolean("is_deleted").notNull().default(false),
   deletedAt: timestamp("deleted_at", { mode: "string" }),
+  // Edit fields
+  isEdited: boolean("is_edited").notNull().default(false),
+  editedAt: timestamp("edited_at", { mode: "string" }),
   // Forward fields
   isForwarded: boolean("is_forwarded").notNull().default(false),
   forwardedFromSenderName: text("forwarded_from_sender_name"),

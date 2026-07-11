@@ -7,7 +7,7 @@ import { useUser } from "@clerk/react";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useContentDict } from "@/hooks/use-content";
-import { Loader2, MessageCircle, Crown, Shield } from "lucide-react";
+import { Loader2, MessageCircle, Crown, Shield, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { attachmentSrc } from "@/lib/storage";
@@ -59,6 +59,11 @@ export default function AdminsPage() {
         {isLoading ? (
           <div className="py-24 flex justify-center">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : !admins?.length ? (
+          <div className="text-center py-24 glass rounded-3xl border border-border/50">
+            <Users className="w-16 h-16 mx-auto mb-4 text-muted-foreground/30" />
+            <p className="text-muted-foreground font-serif text-xl">{t('admin.noUsers')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

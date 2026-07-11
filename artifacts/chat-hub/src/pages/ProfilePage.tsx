@@ -1,9 +1,9 @@
 import { PageTransition } from '@/components/PageTransition';
 import { Link } from "wouter";
-import { UserProfile } from "@clerk/react";
+import { UserProfile, useUser } from "@clerk/react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { ArrowLeft, Camera, Loader2, User, X, Check, Clock } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, User, X, Check, Clock, Settings } from "lucide-react";
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGetMyProfile, useUpdateMyProfile, useRequestUploadUrl } from '@workspace/api-client-react';
 import { useState, useRef } from 'react';
@@ -18,19 +18,43 @@ export default function ProfilePage() {
   return (
     <PageTransition className="min-h-screen flex flex-col bg-background">
       <Navbar />
-      <main className="flex-grow container mx-auto px-6 py-24 sm:py-32 max-w-4xl flex flex-col items-center">
+      <main className="flex-grow container mx-auto px-6 py-24 sm:py-32 max-w-3xl flex flex-col items-center">
+        {/* Back link */}
         <div className="w-full flex justify-start mb-8" dir={isRtl ? 'rtl' : 'ltr'}>
           <Link href="/portal" className="text-muted-foreground hover:text-primary transition-colors flex items-center text-sm font-medium">
-            <ArrowLeft className={`w-4 h-4 ${isRtl ? 'rotate-180 ml-2' : 'mr-2'}`} /> {t('auth.backHome')}
+            <ArrowLeft className={`w-4 h-4 ${isRtl ? 'rotate-180 ml-2' : 'mr-2'}`} />
+            {t('auth.backHome')}
           </Link>
         </div>
 
-        {/* Custom profile section */}
-        <div className="w-full mb-10" dir={isRtl ? 'rtl' : 'ltr'}>
+        {/* ── Section 1: Public profile (nickname + avatar) ── */}
+        <div className="w-full mb-4" dir={isRtl ? 'rtl' : 'ltr'}>
+          <div className="flex items-center gap-2 mb-3">
+            <User className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-bold uppercase tracking-widest text-primary/80">
+              {t('profile.publicSection')}
+            </h2>
+          </div>
           <CustomProfileSection />
         </div>
 
+        {/* ── Section divider ── */}
+        <div className="w-full flex items-center gap-4 my-8" dir={isRtl ? 'rtl' : 'ltr'}>
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+          <div className="flex items-center gap-2 text-muted-foreground/60">
+            <Settings className="w-3.5 h-3.5" />
+            <span className="text-[0.65rem] uppercase tracking-[0.2em] font-semibold">
+              {t('profile.accountSection')}
+            </span>
+          </div>
+          <div className="flex-1 h-px bg-gradient-to-l from-transparent via-border to-transparent" />
+        </div>
+
+        {/* ── Section 2: Clerk account management (email, password, security) ── */}
         <div className="w-full" dir={isRtl ? 'rtl' : 'ltr'}>
+          <p className="text-xs text-muted-foreground mb-5">
+            {t('profile.accountDesc')}
+          </p>
           <UserProfile routing="hash" />
         </div>
       </main>
@@ -41,6 +65,7 @@ export default function ProfilePage() {
 
 function CustomProfileSection() {
   const { t, language, isRtl } = useLanguage();
+  const { user } = useUser();
   const { data: profile, isLoading, refetch } = useGetMyProfile();
   const updateProfile = useUpdateMyProfile();
   const requestUploadUrl = useRequestUploadUrl();
@@ -60,18 +85,24 @@ function CustomProfileSection() {
 
   if (!profile) return null;
 
-  // Compare as timestamps (ms) to avoid string-format differences between
-  // createdAt and nicknameUpdatedAt from the DB.
+  // Cooldown logic
   const nicknameNeverChanged =
     Math.abs(
       new Date(profile.nicknameUpdatedAt).getTime() -
       new Date(profile.createdAt).getTime()
-    ) < 2000; // within 2 seconds → treat as "never manually changed"
+    ) < 2000;
 
   const lastChangeMs = new Date(profile.nicknameUpdatedAt).getTime();
   const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
   const cooldownExpires = new Date(lastChangeMs + thirtyDaysMs);
   const isCoolingDown = !nicknameNeverChanged && Date.now() < cooldownExpires.getTime();
+
+  const formatDate = (d: Date) =>
+    language === 'AR'
+      ? d.toLocaleDateString('ar')
+      : language === 'EN'
+        ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+        : d.toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const startEdit = () => {
     setNickname(profile.nickname);
@@ -86,7 +117,6 @@ function CustomProfileSection() {
   const handleSaveNickname = async () => {
     const trimmed = nickname.trim();
     if (!trimmed) return;
-    // Prevent no-op save
     if (trimmed === profile.nickname) {
       setIsEditingNickname(false);
       return;
@@ -102,28 +132,17 @@ function CustomProfileSection() {
       const msg: string = apiErr?.message || '';
 
       if (status === 409) {
-        // Nickname already taken — show friendly localised message
-        toast({
-          title: t('nickname.error'),
-          description: t('nickname.taken'),
-          variant: 'destructive',
-        });
+        toast({ title: t('nickname.error'), description: t('nickname.taken'), variant: 'destructive' });
         return;
       }
 
-      // Cooldown: server embeds the next-allowed date in the message
       const dateMatch = msg.match(/after (.+)\./);
       if (status === 429 || dateMatch) {
         const dateStr = dateMatch ? dateMatch[1] : null;
         const d = dateStr ? new Date(dateStr) : cooldownExpires;
-        const formattedDate = language === 'AR'
-          ? d.toLocaleDateString('ar')
-          : language === 'EN'
-            ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-            : d.toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' });
         toast({
           title: t('profile.cooldownTitle'),
-          description: t('profile.cooldownDesc').replace('{date}', formattedDate),
+          description: t('profile.cooldownDesc').replace('{date}', formatDate(d)),
           variant: 'destructive',
         });
         return;
@@ -168,23 +187,16 @@ function CustomProfileSection() {
 
   const avatarSrc = profile.avatarUrl ? attachmentSrc(profile.avatarUrl) : '';
 
+  // Full name from Clerk — only shown when it actually exists on the user object
+  const hasFullName = !!(user?.firstName || user?.lastName);
+  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ');
+
   return (
     <div className="glass rounded-[2rem] border border-border/30 p-8 shadow-xl">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
-          <User className="w-5 h-5 text-primary" />
-        </div>
-        <div>
-          <h2 className="text-xl font-serif font-bold">{t('profile.title')}</h2>
-          <p className="text-xs text-muted-foreground">{t('profile.subtitle')}</p>
-        </div>
-      </div>
-
       <div className="flex flex-col sm:flex-row gap-8 items-start">
         {/* Avatar block */}
         <div className="flex flex-col items-center gap-3 flex-shrink-0">
           <div className="relative group">
-            {/* key forces AvatarImage to re-mount when src changes, clearing browser cache */}
             <Avatar key={avatarSrc} className="w-24 h-24 border-2 border-primary/30 shadow-lg">
               <AvatarImage src={avatarSrc} />
               <AvatarFallback className="bg-primary/10 text-primary text-2xl font-serif font-bold">
@@ -233,77 +245,82 @@ function CustomProfileSection() {
           </div>
         </div>
 
-        {/* Nickname block */}
-        <div className="flex-1 min-w-0">
-          <div className="mb-3">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        {/* Right column: nickname + optional full name */}
+        <div className="flex-1 min-w-0 space-y-5" dir={isRtl ? 'rtl' : 'ltr'}>
+          {/* Nickname field */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
               {t('profile.nicknameLabel')}
             </label>
+
+            {isEditingNickname ? (
+              <div className="space-y-3">
+                <Input
+                  value={nickname}
+                  onChange={e => setNickname(e.target.value)}
+                  maxLength={32}
+                  className="bg-background/50 border-primary/30 focus:border-primary/60 rounded-xl"
+                  autoFocus
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSaveNickname();
+                    if (e.key === 'Escape') cancelEdit();
+                  }}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleSaveNickname}
+                    disabled={!nickname.trim() || updateProfile.isPending}
+                    className="rounded-full gap-2 text-sm h-9 bg-primary text-primary-foreground font-semibold hover:brightness-110"
+                  >
+                    {updateProfile.isPending
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Check className="w-3.5 h-3.5" />}
+                    {t('admin.save')}
+                  </Button>
+                  <Button variant="ghost" onClick={cancelEdit} className="rounded-full text-sm h-9">
+                    {t('admin.cancel')}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <span className="text-xl font-serif font-bold text-foreground">{profile.nickname}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={startEdit}
+                    disabled={isCoolingDown}
+                    className="rounded-full text-xs h-8 px-3"
+                  >
+                    {t('admin.edit')}
+                  </Button>
+                </div>
+                {isCoolingDown && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-xl px-3 py-2 border border-border/30">
+                    <Clock className="w-3.5 h-3.5 flex-shrink-0 text-primary/60" />
+                    <span>
+                      {t('profile.cooldownDesc').replace('{date}', formatDate(cooldownExpires))}
+                    </span>
+                  </div>
+                )}
+                {!isCoolingDown && !nicknameNeverChanged && (
+                  <p className="text-xs text-muted-foreground">{t('profile.cooldownHint')}</p>
+                )}
+              </div>
+            )}
           </div>
 
-          {isEditingNickname ? (
-            <div className="space-y-3">
-              <Input
-                value={nickname}
-                onChange={e => setNickname(e.target.value)}
-                maxLength={32}
-                className="bg-background/50 border-primary/30 focus:border-primary/60 rounded-xl"
-                autoFocus
-                onKeyDown={e => {
-                  if (e.key === 'Enter') handleSaveNickname();
-                  if (e.key === 'Escape') cancelEdit();
-                }}
-              />
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleSaveNickname}
-                  disabled={!nickname.trim() || updateProfile.isPending}
-                  className="rounded-full gap-2 text-sm h-9 bg-primary text-primary-foreground font-semibold hover:brightness-110"
-                >
-                  {updateProfile.isPending
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : <Check className="w-3.5 h-3.5" />}
-                  {t('admin.save')}
-                </Button>
-                <Button variant="ghost" onClick={cancelEdit} className="rounded-full text-sm h-9">
-                  {t('admin.cancel')}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
+          {/* Full name — only shown when Clerk has a name set for this user */}
+          {hasFullName && (
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
+                {t('profile.fullNameLabel')}
+              </label>
               <div className="flex items-center gap-3">
-                <span className="text-xl font-serif font-bold text-foreground">{profile.nickname}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={startEdit}
-                  disabled={isCoolingDown}
-                  className="rounded-full text-xs h-8 px-3"
-                >
-                  {t('admin.edit')}
-                </Button>
+                <span className="text-base font-sans text-foreground/90">{fullName}</span>
               </div>
-              {isCoolingDown && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-xl px-3 py-2 border border-border/30">
-                  <Clock className="w-3.5 h-3.5 flex-shrink-0 text-primary/60" />
-                  <span>
-                    {t('profile.cooldownDesc').replace(
-                      '{date}',
-                      language === 'AR'
-                        ? cooldownExpires.toLocaleDateString('ar')
-                        : language === 'EN'
-                          ? cooldownExpires.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-                          : cooldownExpires.toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' })
-                    )}
-                  </span>
-                </div>
-              )}
-              {!isCoolingDown && !nicknameNeverChanged && (
-                <p className="text-xs text-muted-foreground">
-                  {t('profile.cooldownHint')}
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground mt-1.5">{t('profile.fullNameHint')}</p>
             </div>
           )}
         </div>

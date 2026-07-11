@@ -9,9 +9,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut, User, Settings } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export function UserMenu() {
   const { user } = useUser();
+  const { t } = useLanguage();
   
   if (!user) return null;
 
@@ -38,20 +40,20 @@ export function UserMenu() {
         <DropdownMenuItem asChild className="cursor-pointer py-2.5 hover:bg-muted/50 focus:bg-muted/50">
           <Link href="/portal" className="flex items-center w-full">
             <User className="w-4 h-4 mr-2 text-muted-foreground" />
-            <span>Портал</span>
+            <span>{t('portal.greeting')}</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild className="cursor-pointer py-2.5 hover:bg-muted/50 focus:bg-muted/50">
           <Link href="/profile" className="flex items-center w-full">
             <Settings className="w-4 h-4 mr-2 text-muted-foreground" />
-            <span>Настройки профиля</span>
+            <span>{t('nav.manageAccount')}</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-border/50" />
         <SignOutButton>
           <DropdownMenuItem className="cursor-pointer py-2.5 text-destructive focus:bg-destructive/10 focus:text-destructive">
             <LogOut className="w-4 h-4 mr-2" />
-            <span>Выйти</span>
+            <span>{t('nav.signout')}</span>
           </DropdownMenuItem>
         </SignOutButton>
       </DropdownMenuContent>

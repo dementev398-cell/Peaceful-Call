@@ -1,6 +1,6 @@
 import { parseApiDate } from "@/lib/date";
 import { PageTransition } from '@/components/PageTransition';
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Navbar } from "@/components/Navbar";
 import { 
   useListConversations, 
@@ -11,19 +11,32 @@ import {
   useStartDirectConversation,
   useMarkConversationRead,
   useGetMe,
+  useDeleteChatMessage,
+  useEditChatMessage,
   getListConversationsQueryKey,
   getListChatMessagesQueryKey,
 } from "@workspace/api-client-react";
+import type { ChatMessage } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, Search, Send, FilePlus, Paperclip, X, Download, FileText, UserCircle, MessageCircle, Shield, Eye, ArrowLeft } from "lucide-react";
+import { Loader2, Search, Send, FilePlus, Paperclip, X, Download, FileText, UserCircle, MessageCircle, Shield, Eye, ArrowLeft, MoreHorizontal, Trash2, Pencil, Check } from "lucide-react";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useRequestUploadUrl } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useSearch } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -289,26 +302,366 @@ export default function MessagesPage() {
   );
 }
 
+// ── Delete Confirmation Dialog ────────────────────────────────────────────────
+
+function DeleteConfirmDialog({
+  open,
+  scope,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  scope: 'me' | 'everyone';
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <AlertDialog open={open}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {scope === 'everyone' ? 'Удалить у всех?' : 'Удалить у себя?'}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {scope === 'everyone'
+              ? 'Сообщение будет удалено для всех участников беседы. Это действие необратимо.'
+              : 'Сообщение будет скрыто только для вас. Собеседник по-прежнему его увидит.'}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onCancel}>Отмена</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={onConfirm}
+            className={scope === 'everyone' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+          >
+            Удалить
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+// ── Message Actions Menu ──────────────────────────────────────────────────────
+// On desktop: hover reveals a small floating menu
+// On mobile: tap a button that appears on the message to reveal actions
+
+type PendingDelete = { messageId: number; scope: 'me' | 'everyone' };
+
+function MessageBubble({
+  msg,
+  isMe,
+  showAvatar,
+  conversationId,
+  onOptimisticDelete,
+  onOptimisticEdit,
+}: {
+  msg: ChatMessage;
+  isMe: boolean;
+  showAvatar: boolean;
+  conversationId: number;
+  onOptimisticDelete: (id: number, scope: 'me' | 'everyone') => void;
+  onOptimisticEdit: (id: number, content: string) => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editContent, setEditContent] = useState(msg.content ?? '');
+  const menuRef = useRef<HTMLDivElement>(null);
+  const editRef = useRef<HTMLTextAreaElement>(null);
+
+  const deleteMessage = useDeleteChatMessage();
+  const editMessage = useEditChatMessage();
+
+  // Determine if we can edit: sender only, not deleted, has text content
+  const canEdit = isMe && !msg.isDeleted && !!msg.content && !msg.attachmentUrl;
+  const canDeleteForEveryone = isMe && !msg.isDeleted;
+  // Can always delete for me (hide) if not already deleted globally
+  const canDeleteForMe = !msg.isDeleted;
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpen]);
+
+  // Focus edit area when entering edit mode
+  useEffect(() => {
+    if (editMode && editRef.current) {
+      editRef.current.focus();
+      editRef.current.selectionStart = editRef.current.value.length;
+    }
+  }, [editMode]);
+
+  const handleDeleteConfirm = () => {
+    if (!pendingDelete) return;
+    const { messageId, scope } = pendingDelete;
+    // Optimistic update
+    onOptimisticDelete(messageId, scope);
+    deleteMessage.mutate({ id: messageId, params: { scope } });
+    setPendingDelete(null);
+    setMenuOpen(false);
+  };
+
+  const handleEditSave = () => {
+    const trimmed = editContent.trim();
+    if (!trimmed || trimmed === msg.content) {
+      setEditMode(false);
+      return;
+    }
+    onOptimisticEdit(msg.id, trimmed);
+    editMessage.mutate({ id: msg.id, data: { content: trimmed } });
+    setEditMode(false);
+  };
+
+  const handleEditCancel = () => {
+    setEditContent(msg.content ?? '');
+    setEditMode(false);
+  };
+
+  const showActionsMenu = !msg.isDeleted && (canEdit || canDeleteForEveryone || canDeleteForMe);
+
+  return (
+    <>
+      <DeleteConfirmDialog
+        open={!!pendingDelete}
+        scope={pendingDelete?.scope ?? 'me'}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setPendingDelete(null)}
+      />
+
+      <div className={`flex gap-3 max-w-[85%] ${isMe ? 'self-end flex-row-reverse' : 'self-start'}`}>
+        {!isMe && (
+          <div className="w-8 shrink-0">
+            {showAvatar && (
+              <Avatar className="w-8 h-8">
+                <AvatarImage src={msg.senderAvatarUrl || ''} />
+                <AvatarFallback className="text-[10px]">{msg.senderName.charAt(0)}</AvatarFallback>
+              </Avatar>
+            )}
+          </div>
+        )}
+
+        <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+          {showAvatar && (
+            <span className="text-xs text-muted-foreground mb-1 ml-1 font-medium flex items-center gap-1">
+              {msg.senderName}
+              {msg.senderIsAdmin === 'true' && (
+                <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider">Админ</span>
+              )}
+            </span>
+          )}
+
+          {/* Message bubble + hover/tap actions */}
+          <div
+            ref={menuRef}
+            className={`relative group flex items-center gap-1 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
+          >
+            {/* Desktop: fade-in action button on hover */}
+            {showActionsMenu && (
+              <div
+                className={`
+                  shrink-0 flex items-center
+                  opacity-0 group-hover:opacity-100 transition-opacity
+                  ${isMe ? 'mr-1' : 'ml-1'}
+                `}
+              >
+                <button
+                  onClick={() => setMenuOpen(v => !v)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Действия с сообщением"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Mobile: always-visible tap target (small dot), only shown on touch */}
+            {showActionsMenu && (
+              <div
+                className={`
+                  shrink-0 flex items-center
+                  sm:hidden
+                  ${isMe ? 'mr-1' : 'ml-1'}
+                `}
+              >
+                <button
+                  onClick={() => setMenuOpen(v => !v)}
+                  className="w-10 h-10 flex items-center justify-center rounded-full active:bg-muted text-muted-foreground transition-colors"
+                  aria-label="Действия с сообщением"
+                >
+                  <MoreHorizontal className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+
+            {/* Bubble */}
+            <div className={`rounded-2xl px-4 py-2.5 ${
+              isMe
+                ? 'bg-primary text-primary-foreground rounded-tr-sm'
+                : 'bg-muted rounded-tl-sm border border-border/50 text-foreground'
+            }`}>
+              {msg.isDeleted ? (
+                <p className="text-sm italic opacity-60">Сообщение удалено</p>
+              ) : editMode ? (
+                <div className="flex flex-col gap-2 min-w-[180px]">
+                  <textarea
+                    ref={editRef}
+                    value={editContent}
+                    onChange={e => setEditContent(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEditSave(); }
+                      if (e.key === 'Escape') handleEditCancel();
+                    }}
+                    className="w-full bg-transparent border-0 outline-none resize-none text-sm leading-relaxed text-inherit placeholder:opacity-50 min-h-[40px] max-h-[120px]"
+                    rows={2}
+                  />
+                  <div className="flex gap-1.5 justify-end">
+                    <button
+                      onClick={handleEditCancel}
+                      className="text-[11px] px-2 py-1 rounded opacity-70 hover:opacity-100 transition-opacity"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      onClick={handleEditSave}
+                      disabled={editMessage.isPending}
+                      className="text-[11px] px-2 py-1 rounded bg-white/20 hover:bg-white/30 transition-colors flex items-center gap-1"
+                    >
+                      {editMessage.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                      Сохранить
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {msg.content && <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>}
+                  {msg.attachmentUrl && (
+                    <AttachmentPreview
+                      url={`${import.meta.env.BASE_URL}api/storage${msg.attachmentUrl}`}
+                      type={msg.attachmentType}
+                      name={msg.attachmentName || 'Файл'}
+                      size={msg.attachmentSize ?? null}
+                      isMe={isMe}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Dropdown actions menu */}
+            {menuOpen && (
+              <div
+                className={`
+                  absolute z-30 top-full mt-1 bg-popover border border-border rounded-xl shadow-lg py-1 min-w-[180px]
+                  ${isMe ? 'right-10' : 'left-10'}
+                `}
+              >
+                {canEdit && (
+                  <button
+                    onClick={() => { setEditMode(true); setMenuOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                  >
+                    <Pencil className="w-4 h-4 text-muted-foreground shrink-0" />
+                    Редактировать
+                  </button>
+                )}
+                {canDeleteForEveryone && (
+                  <button
+                    onClick={() => { setPendingDelete({ messageId: msg.id, scope: 'everyone' }); setMenuOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors text-left"
+                  >
+                    <Trash2 className="w-4 h-4 shrink-0" />
+                    Удалить у всех
+                  </button>
+                )}
+                {canDeleteForMe && (
+                  <button
+                    onClick={() => { setPendingDelete({ messageId: msg.id, scope: 'me' }); setMenuOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted transition-colors text-left"
+                  >
+                    <Trash2 className="w-4 h-4 shrink-0 opacity-70" />
+                    Удалить у себя
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1 mt-1">
+            {msg.isEdited && !msg.isDeleted && (
+              <span className="text-[10px] text-muted-foreground opacity-60 italic">(изменено)</span>
+            )}
+            <span className="text-[10px] text-muted-foreground opacity-60">
+              {parseApiDate(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function ChatThread({ conversationId, onBack }: { conversationId: number, onBack: () => void }) {
   const { user } = useUser();
   const queryClient = useQueryClient();
   const [content, setContent] = useState('');
   const [pendingUpload, setPendingUpload] = useState<File | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Local optimistic messages state (a patched overlay on top of server data)
+  const [localMessages, setLocalMessages] = useState<ChatMessage[] | null>(null);
   
   // Polling for new messages
-  const { data: messages = [], isLoading } = useListChatMessages(conversationId, {
-    query: { refetchInterval: 5000 } as any // poll every 5s
+  const { data: serverMessages = [], isLoading } = useListChatMessages(conversationId, {
+    query: { refetchInterval: 5000 } as any
   });
-  
+
+  // Keep localMessages in sync: on each server refresh, merge in any optimistic edits/deletes
+  useEffect(() => {
+    setLocalMessages(null);
+  }, [serverMessages]);
+
+  const messages: ChatMessage[] = localMessages ?? serverMessages;
+
   const sendMessage = useSendChatMessage();
   const requestUploadUrl = useRequestUploadUrl();
   const [isUploading, setIsUploading] = useState(false);
 
-  const invalidateMessages = () => {
+  const invalidateMessages = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: getListChatMessagesQueryKey(conversationId) });
     queryClient.invalidateQueries({ queryKey: getListConversationsQueryKey() });
-  };
+  }, [queryClient, conversationId]);
+
+  // Optimistic delete
+  const handleOptimisticDelete = useCallback((id: number, scope: 'me' | 'everyone') => {
+    setLocalMessages(prev => {
+      const base = prev ?? serverMessages;
+      if (scope === 'everyone') {
+        return base.map(m => m.id === id ? { ...m, isDeleted: true, content: null, attachmentUrl: null } : m);
+      } else {
+        // scope=me: hide from local view
+        return base.filter(m => m.id !== id);
+      }
+    });
+    // Also schedule a refetch after mutation settles
+    setTimeout(invalidateMessages, 800);
+  }, [serverMessages, invalidateMessages]);
+
+  // Optimistic edit
+  const handleOptimisticEdit = useCallback((id: number, newContent: string) => {
+    setLocalMessages(prev => {
+      const base = prev ?? serverMessages;
+      return base.map(m => m.id === id ? { ...m, content: newContent, isEdited: true } : m);
+    });
+    setTimeout(invalidateMessages, 800);
+  }, [serverMessages, invalidateMessages]);
 
   const uploadFile = async (file: File) => {
     setIsUploading(true);
@@ -393,53 +746,15 @@ function ChatThread({ conversationId, onBack }: { conversationId: number, onBack
               const showAvatar = !isMe && (i === 0 || messages[i-1].senderClerkId !== msg.senderClerkId);
               
               return (
-                <div key={msg.id} className={`flex gap-3 max-w-[85%] ${isMe ? 'self-end flex-row-reverse' : 'self-start'}`}>
-                  {!isMe && (
-                    <div className="w-8 shrink-0">
-                      {showAvatar && (
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src={msg.senderAvatarUrl || ''} />
-                          <AvatarFallback className="text-[10px]">{msg.senderName.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                      )}
-                    </div>
-                  )}
-                  
-                  <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                    {showAvatar && (
-                      <span className="text-xs text-muted-foreground mb-1 ml-1 font-medium flex items-center gap-1">
-                        {msg.senderName} 
-                        {msg.senderIsAdmin === 'true' && <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider">Админ</span>}
-                      </span>
-                    )}
-                    
-                    <div className={`rounded-2xl px-4 py-2.5 ${
-                      isMe 
-                        ? 'bg-primary text-primary-foreground rounded-tr-sm' 
-                        : 'bg-muted rounded-tl-sm border border-border/50 text-foreground'
-                    }`}>
-                      {msg.isDeleted ? (
-                        <p className="text-sm italic opacity-60">Сообщение удалено</p>
-                      ) : (
-                        <>
-                          {msg.content && <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>}
-                          {msg.attachmentUrl && (
-                            <AttachmentPreview 
-                              url={`${import.meta.env.BASE_URL}api/storage${msg.attachmentUrl}`}
-                              type={msg.attachmentType}
-                              name={msg.attachmentName || 'Файл'}
-                              size={msg.attachmentSize ?? null}
-                              isMe={isMe}
-                            />
-                          )}
-                        </>
-                      )}
-                    </div>
-                    <span className="text-[10px] text-muted-foreground mt-1 opacity-60">
-                      {parseApiDate(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                </div>
+                <MessageBubble
+                  key={msg.id}
+                  msg={msg}
+                  isMe={isMe}
+                  showAvatar={showAvatar}
+                  conversationId={conversationId}
+                  onOptimisticDelete={handleOptimisticDelete}
+                  onOptimisticEdit={handleOptimisticEdit}
+                />
               );
             })}
           </div>
@@ -573,9 +888,14 @@ function AdminReadonlyChatThread({
                         <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                       )}
                     </div>
-                    <span className="text-[10px] text-muted-foreground mt-1 opacity-60">
-                      {parseApiDate(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                    <div className="flex items-center gap-1 mt-1">
+                      {msg.isEdited && !msg.isDeleted && (
+                        <span className="text-[10px] text-muted-foreground opacity-60 italic">(изменено)</span>
+                      )}
+                      <span className="text-[10px] text-muted-foreground mt-1 opacity-60">
+                        {parseApiDate(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
