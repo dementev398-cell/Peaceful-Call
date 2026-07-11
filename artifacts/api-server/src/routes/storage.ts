@@ -16,6 +16,44 @@ function hasAuthenticatedSession(req: Request): boolean {
   return Boolean(getAuth(req)?.userId);
 }
 
+// Upload guardrails: the client declares `size`/`contentType` up front (before
+// the actual PUT to the presigned URL). Per product requirements, images and
+// videos of any size/format should be accepted without an artificial cap —
+// we only reject clearly bogus sizes and non-media/document content types to
+// stop unrelated/dangerous file types (e.g. executables) from being stored.
+const MAX_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB absolute safety ceiling
+const ALLOWED_CONTENT_TYPE_PREFIXES = [
+  'image/',
+  'video/',
+  'audio/',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument',
+  'application/vnd.ms-excel',
+  'application/vnd.ms-powerpoint',
+  'text/plain',
+  'application/zip',
+];
+
+function validateUpload(
+  contentType: string,
+  size: number,
+): { ok: true } | { ok: false; error: string } {
+  const isAllowedType = ALLOWED_CONTENT_TYPE_PREFIXES.some((prefix) =>
+    contentType.startsWith(prefix),
+  );
+  if (!isAllowedType) {
+    return { ok: false, error: `File type "${contentType}" is not allowed` };
+  }
+  if (size <= 0 || size > MAX_BYTES) {
+    return {
+      ok: false,
+      error: `File exceeds the ${Math.round(MAX_BYTES / (1024 * 1024 * 1024))}GB limit`,
+    };
+  }
+  return { ok: true };
+}
+
 /**
  * POST /storage/uploads/request-url
  *
@@ -41,6 +79,12 @@ router.post(
 
     try {
       const { name, size, contentType } = parsed.data;
+
+      const validation = validateUpload(contentType, size);
+      if (!validation.ok) {
+        res.status(400).json({ error: validation.error });
+        return;
+      }
 
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
       const objectPath =

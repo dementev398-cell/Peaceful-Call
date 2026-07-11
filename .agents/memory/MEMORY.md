@@ -1,1 +1,2 @@
 - [Peaceful Call restore](peaceful-call-restore.md) — restored from a full project backup zip; original archive had an Orval params-collision bug, fixed pattern documented there.
+- [Peaceful Call i18n](peaceful-call-i18n.md) — real localization system is `LanguageContext.tsx` (RU/EN/AR, `t()`), not the legacy `src/lib/i18n.ts`; Clerk locale files silently fall back to English for several placeholder keys.

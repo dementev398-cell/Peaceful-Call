@@ -9,30 +9,64 @@ import {
   useStartSupportConversation,
   useListChatUsers,
   useStartDirectConversation,
-  useMarkConversationRead
+  useMarkConversationRead,
+  useGetMe,
+  getListConversationsQueryKey,
+  getListChatMessagesQueryKey,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, Search, Send, FilePlus, Paperclip, X, Download, FileImage, FileText, FileVideo, UserCircle, MessageCircle, Shield } from "lucide-react";
+import { Loader2, Search, Send, FilePlus, Paperclip, X, Download, FileText, UserCircle, MessageCircle, Shield, Eye, ArrowLeft } from "lucide-react";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useRequestUploadUrl } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useSearch } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 
+// Super-admin: fetch any user's conversations via custom API call
+async function fetchAdminUserConversations(clerkUserId: string) {
+  const res = await fetch(`/api/chat/admin/users/${encodeURIComponent(clerkUserId)}/conversations`, {
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error('Forbidden');
+  return res.json();
+}
+
+async function fetchAdminConversationMessages(conversationId: number) {
+  const res = await fetch(`/api/chat/admin/conversations/${conversationId}/messages`, {
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error('Forbidden');
+  return res.json();
+}
+
 export default function MessagesPage() {
   const { t } = useLanguage();
   const { user } = useUser();
   const search = useSearch();
+  const queryClient = useQueryClient();
   const [activeConvId, setActiveConvId] = useState<number | null>(null);
+  const [convSearch, setConvSearch] = useState('');
+
+  // Super-admin: viewing another user's chats
+  const [adminViewClerkId, setAdminViewClerkId] = useState<string | null>(null);
+  const [adminViewConvs, setAdminViewConvs] = useState<any[]>([]);
+  const [adminViewLoading, setAdminViewLoading] = useState(false);
+  const [adminViewConvId, setAdminViewConvId] = useState<number | null>(null);
+
+  const { data: me } = useGetMe();
+  const isSuperAdmin = me?.role === 'owner';
   
-  const { data: conversations = [], isLoading: loadingConvs, refetch: refetchConvs } = useListConversations();
+  const { data: conversations = [], isLoading: loadingConvs, refetch: refetchConvs } = useListConversations({
+    query: { refetchInterval: 15000 } as any // poll for new conversations/messages
+  });
   const markRead = useMarkConversationRead();
 
-  // Deep-link support: /messages?conv=<id> (e.g. from "Write message" on the admin's profile)
+  // Deep-link support: /messages?conv=<id>
   useEffect(() => {
     const convParam = new URLSearchParams(search).get('conv');
     if (convParam) {
@@ -45,9 +79,41 @@ export default function MessagesPage() {
     setActiveConvId(id);
     const conv = conversations.find(c => c.id === id);
     if (conv?.unread) {
-      markRead.mutate({ id });
-      setTimeout(() => refetchConvs(), 500); // give the mutation a moment before refetching summary
+      markRead.mutate({ id }, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListConversationsQueryKey() });
+        }
+      });
     }
+  };
+
+  // Filter conversations by search query (by title/email)
+  const filteredConversations = convSearch.trim()
+    ? conversations.filter(c => {
+        const haystack = `${c.title} ${c.lastMessagePreview ?? ''}`.toLowerCase();
+        return haystack.includes(convSearch.toLowerCase());
+      })
+    : conversations;
+
+  // Super-admin: load conversations for a user
+  const handleAdminViewUser = async (clerkUserId: string) => {
+    setAdminViewClerkId(clerkUserId);
+    setAdminViewConvId(null);
+    setAdminViewLoading(true);
+    try {
+      const convs = await fetchAdminUserConversations(clerkUserId);
+      setAdminViewConvs(Array.isArray(convs) ? convs : []);
+    } catch {
+      setAdminViewConvs([]);
+    } finally {
+      setAdminViewLoading(false);
+    }
+  };
+
+  const handleExitAdminView = () => {
+    setAdminViewClerkId(null);
+    setAdminViewConvs([]);
+    setAdminViewConvId(null);
   };
 
   return (
@@ -60,79 +126,164 @@ export default function MessagesPage() {
               <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground mb-2">{t('messages.title')}</h1>
               <p className="text-muted-foreground text-sm font-serif">{t('messages.subtitle')}</p>
             </div>
-            <NewConversationDialog onSelect={handleSelectConv} />
-          </div>
-        </ScrollReveal>
-
-        <div className="bg-card/40 glass border border-border/40 rounded-[2rem] overflow-hidden h-[calc(100vh-280px)] min-h-[600px] flex shadow-2xl">
-          {/* Sidebar */}
-          <div className={`${activeConvId ? 'hidden md:flex' : 'flex'} w-full md:w-80 lg:w-96 flex-col border-r border-border/40 bg-muted/10`}>
-            <div className="p-5 border-b border-border/40">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input placeholder="Поиск бесед..." className="pl-10 bg-background/50 border-border/40 rounded-full h-11" />
-              </div>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {loadingConvs ? (
-                <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
-              ) : conversations.length === 0 ? (
-                <div className="text-center py-10 px-4 text-muted-foreground text-sm">
-                  <MessageCircle className="w-8 h-8 mx-auto mb-3 opacity-20" />
-                  У вас пока нет активных диалогов
-                </div>
-              ) : (
-                conversations.map(conv => (
-                  <button
-                    key={conv.id}
-                    onClick={() => handleSelectConv(conv.id)}
-                    className={`w-full flex items-start gap-3 p-3 rounded-2xl transition-all text-left ${activeConvId === conv.id ? 'bg-primary/10 border border-primary/20' : 'hover:bg-muted border border-transparent'}`}
-                  >
-                    <div className="relative mt-0.5">
-                      <Avatar className="w-12 h-12 border border-border">
-                        <AvatarImage src={conv.otherAvatarUrl || ''} />
-                        <AvatarFallback className={conv.kind === 'support' ? 'bg-primary/20 text-primary' : 'bg-secondary'}>
-                          {conv.kind === 'support' ? 'АД' : conv.title.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      {conv.unread && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary border-2 border-card" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-baseline mb-1">
-                        <span className="font-bold text-sm truncate pr-2 text-foreground">
-                          {conv.kind === 'support' ? 'Администрация' : conv.title}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground flex-shrink-0">
-                          {parseApiDate(conv.lastMessageAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <p className={`text-xs truncate ${conv.unread ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}>
-                        {conv.lastMessagePreview || 'Нет сообщений'}
-                      </p>
-                    </div>
-                  </button>
-                ))
+            <div className="flex items-center gap-2">
+              {isSuperAdmin && !adminViewClerkId && (
+                <SuperAdminUserPickerDialog onSelectUser={handleAdminViewUser} />
+              )}
+              {adminViewClerkId && (
+                <Button variant="outline" onClick={handleExitAdminView} className="rounded-full gap-2">
+                  <ArrowLeft className="w-4 h-4" /> Выйти из режима просмотра
+                </Button>
+              )}
+              {!adminViewClerkId && (
+                <NewConversationDialog onSelect={handleSelectConv} />
               )}
             </div>
           </div>
+        </ScrollReveal>
 
-          {/* Chat Area */}
-          <div className={`${!activeConvId ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-background relative`}>
-            {activeConvId ? (
-              <ChatThread conversationId={activeConvId} onBack={() => setActiveConvId(null)} />
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8">
-                <div className="w-24 h-24 rounded-full bg-muted/50 flex items-center justify-center mb-6">
-                  <MessageCircle className="w-10 h-10 text-muted-foreground/30" />
+        {adminViewClerkId ? (
+          // Super-admin view: another user's chats
+          <div className="bg-card/40 glass border border-amber-500/40 rounded-[2rem] overflow-hidden h-[calc(100vh-280px)] min-h-[600px] flex shadow-2xl">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500/60 rounded-full" />
+            {/* Sidebar */}
+            <div className={`${adminViewConvId ? 'hidden md:flex' : 'flex'} w-full md:w-80 lg:w-96 flex-col border-r border-border/40 bg-amber-500/5`}>
+              <div className="p-4 border-b border-border/40 bg-amber-500/10">
+                <div className="flex items-center gap-2 text-amber-600 font-semibold text-sm mb-1">
+                  <Eye className="w-4 h-4" /> Режим просмотра (super-admin)
                 </div>
-                <p className="font-serif text-xl">Выберите беседу для начала общения</p>
+                <p className="text-xs text-muted-foreground">Вы просматриваете чаты другого пользователя</p>
               </div>
-            )}
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                {adminViewLoading ? (
+                  <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+                ) : adminViewConvs.length === 0 ? (
+                  <div className="text-center py-10 px-4 text-muted-foreground text-sm">
+                    <MessageCircle className="w-8 h-8 mx-auto mb-3 opacity-20" />
+                    У этого пользователя нет диалогов
+                  </div>
+                ) : (
+                  adminViewConvs.map((conv: any) => (
+                    <button
+                      key={conv.id}
+                      onClick={() => setAdminViewConvId(conv.id)}
+                      className={`w-full flex items-start gap-3 p-3 rounded-2xl transition-all text-left ${adminViewConvId === conv.id ? 'bg-amber-500/20 border border-amber-500/30' : 'hover:bg-muted border border-transparent'}`}
+                    >
+                      <Avatar className="w-12 h-12 border border-border mt-0.5">
+                        <AvatarImage src={conv.otherAvatarUrl || ''} />
+                        <AvatarFallback className="bg-secondary">{conv.title.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-baseline mb-1">
+                          <span className="font-bold text-sm truncate pr-2 text-foreground">
+                            {conv.kind === 'support' ? 'Администрация' : conv.title}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                            {parseApiDate(conv.lastMessageAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-xs truncate text-muted-foreground">
+                          {conv.lastMessagePreview || 'Нет сообщений'}
+                        </p>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+            {/* Chat Area (read-only) */}
+            <div className={`${!adminViewConvId ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-background relative`}>
+              {adminViewConvId ? (
+                <AdminReadonlyChatThread
+                  conversationId={adminViewConvId}
+                  onBack={() => setAdminViewConvId(null)}
+                  currentUserClerkId={user?.id ?? ''}
+                />
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8">
+                  <MessageCircle className="w-10 h-10 text-muted-foreground/30 mb-4" />
+                  <p className="font-serif text-xl">Выберите беседу для просмотра</p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          // Normal user view
+          <div className="bg-card/40 glass border border-border/40 rounded-[2rem] overflow-hidden h-[calc(100vh-280px)] min-h-[600px] flex shadow-2xl">
+            {/* Sidebar */}
+            <div className={`${activeConvId ? 'hidden md:flex' : 'flex'} w-full md:w-80 lg:w-96 flex-col border-r border-border/40 bg-muted/10`}>
+              <div className="p-5 border-b border-border/40">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Поиск по имени или email..."
+                    value={convSearch}
+                    onChange={e => setConvSearch(e.target.value)}
+                    className="pl-10 bg-background/50 border-border/40 rounded-full h-11"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                {loadingConvs ? (
+                  <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+                ) : filteredConversations.length === 0 ? (
+                  <div className="text-center py-10 px-4 text-muted-foreground text-sm">
+                    <MessageCircle className="w-8 h-8 mx-auto mb-3 opacity-20" />
+                    {convSearch ? 'Беседы не найдены' : 'У вас пока нет активных диалогов'}
+                  </div>
+                ) : (
+                  filteredConversations.map(conv => (
+                    <button
+                      key={conv.id}
+                      onClick={() => handleSelectConv(conv.id)}
+                      className={`w-full flex items-start gap-3 p-3 rounded-2xl transition-all text-left ${activeConvId === conv.id ? 'bg-primary/10 border border-primary/20' : 'hover:bg-muted border border-transparent'}`}
+                    >
+                      <div className="relative mt-0.5">
+                        <Avatar className="w-12 h-12 border border-border">
+                          <AvatarImage src={conv.otherAvatarUrl || ''} />
+                          <AvatarFallback className={conv.kind === 'support' ? 'bg-primary/20 text-primary' : 'bg-secondary'}>
+                            {conv.kind === 'support' ? 'АД' : conv.title.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        {conv.unread && (
+                          <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary border-2 border-card" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-baseline mb-1">
+                          <span className="font-bold text-sm truncate pr-2 text-foreground">
+                            {conv.kind === 'support' ? 'Администрация' : conv.title}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                            {parseApiDate(conv.lastMessageAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className={`text-xs truncate ${conv.unread ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}>
+                          {conv.lastMessagePreview || 'Нет сообщений'}
+                        </p>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Chat Area */}
+            <div className={`${!activeConvId ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-background relative`}>
+              {activeConvId ? (
+                <ChatThread conversationId={activeConvId} onBack={() => setActiveConvId(null)} />
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8">
+                  <div className="w-24 h-24 rounded-full bg-muted/50 flex items-center justify-center mb-6">
+                    <MessageCircle className="w-10 h-10 text-muted-foreground/30" />
+                  </div>
+                  <p className="font-serif text-xl">Выберите беседу для начала общения</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
     </PageTransition>
   );
@@ -140,18 +291,24 @@ export default function MessagesPage() {
 
 function ChatThread({ conversationId, onBack }: { conversationId: number, onBack: () => void }) {
   const { user } = useUser();
+  const queryClient = useQueryClient();
   const [content, setContent] = useState('');
   const [pendingUpload, setPendingUpload] = useState<File | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   
   // Polling for new messages
   const { data: messages = [], isLoading } = useListChatMessages(conversationId, {
-    query: { refetchInterval: 3000 } as any // poll every 3s
+    query: { refetchInterval: 5000 } as any // poll every 5s
   });
   
   const sendMessage = useSendChatMessage();
   const requestUploadUrl = useRequestUploadUrl();
   const [isUploading, setIsUploading] = useState(false);
+
+  const invalidateMessages = () => {
+    queryClient.invalidateQueries({ queryKey: getListChatMessagesQueryKey(conversationId) });
+    queryClient.invalidateQueries({ queryKey: getListConversationsQueryKey() });
+  };
 
   const uploadFile = async (file: File) => {
     setIsUploading(true);
@@ -176,6 +333,7 @@ function ChatThread({ conversationId, onBack }: { conversationId: number, onBack
           setContent('');
           setPendingUpload(null);
           scrollToBottom();
+          invalidateMessages();
         }
       });
     } catch (e) {
@@ -210,6 +368,7 @@ function ChatThread({ conversationId, onBack }: { conversationId: number, onBack
         onSuccess: () => {
           setContent('');
           scrollToBottom();
+          invalidateMessages();
         }
       });
     }
@@ -259,16 +418,21 @@ function ChatThread({ conversationId, onBack }: { conversationId: number, onBack
                         ? 'bg-primary text-primary-foreground rounded-tr-sm' 
                         : 'bg-muted rounded-tl-sm border border-border/50 text-foreground'
                     }`}>
-                      {msg.content && <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>}
-                      
-                      {msg.attachmentUrl && (
-                        <AttachmentPreview 
-                          url={`${import.meta.env.BASE_URL}api/storage${msg.attachmentUrl}`}
-                          type={msg.attachmentType}
-                          name={msg.attachmentName || 'Файл'}
-                          size={msg.attachmentSize ?? null}
-                          isMe={isMe}
-                        />
+                      {msg.isDeleted ? (
+                        <p className="text-sm italic opacity-60">Сообщение удалено</p>
+                      ) : (
+                        <>
+                          {msg.content && <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>}
+                          {msg.attachmentUrl && (
+                            <AttachmentPreview 
+                              url={`${import.meta.env.BASE_URL}api/storage${msg.attachmentUrl}`}
+                              type={msg.attachmentType}
+                              name={msg.attachmentName || 'Файл'}
+                              size={msg.attachmentSize ?? null}
+                              isMe={isMe}
+                            />
+                          )}
+                        </>
                       )}
                     </div>
                     <span className="text-[10px] text-muted-foreground mt-1 opacity-60">
@@ -337,6 +501,97 @@ function ChatThread({ conversationId, onBack }: { conversationId: number, onBack
   );
 }
 
+/** Read-only chat thread for super-admin viewing another user's conversation */
+function AdminReadonlyChatThread({
+  conversationId,
+  onBack,
+  currentUserClerkId,
+}: {
+  conversationId: number;
+  onBack: () => void;
+  currentUserClerkId: string;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchAdminConversationMessages(conversationId)
+      .then(data => setMessages(Array.isArray(data) ? data : []))
+      .catch(() => setMessages([]))
+      .finally(() => setLoading(false));
+  }, [conversationId]);
+
+  useEffect(() => {
+    setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }
+    }, 100);
+  }, [messages.length]);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="h-16 px-4 md:px-6 border-b border-border/50 flex items-center gap-4 bg-amber-500/10 backdrop-blur">
+        <button onClick={onBack} className="md:hidden p-2 -ml-2 text-muted-foreground hover:text-foreground">
+          <X className="w-5 h-5" />
+        </button>
+        <Eye className="w-4 h-4 text-amber-600" />
+        <div className="font-bold font-serif text-lg">Просмотр беседы (только чтение)</div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 md:p-6" ref={scrollRef}>
+        {loading ? (
+          <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+        ) : (
+          <div className="space-y-6 flex flex-col justify-end min-h-full">
+            {messages.map((msg: any, i: number) => {
+              const isA = msg.senderClerkId === currentUserClerkId;
+              const showAvatar = i === 0 || messages[i-1].senderClerkId !== msg.senderClerkId;
+              
+              return (
+                <div key={msg.id} className={`flex gap-3 max-w-[85%] ${isA ? 'self-end flex-row-reverse' : 'self-start'}`}>
+                  {!isA && (
+                    <div className="w-8 shrink-0">
+                      {showAvatar && (
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage src={msg.senderAvatarUrl || ''} />
+                          <AvatarFallback className="text-[10px]">{msg.senderName?.charAt(0) ?? '?'}</AvatarFallback>
+                        </Avatar>
+                      )}
+                    </div>
+                  )}
+                  <div className={`flex flex-col ${isA ? 'items-end' : 'items-start'}`}>
+                    {showAvatar && (
+                      <span className="text-xs text-muted-foreground mb-1 ml-1 font-medium">{msg.senderName}</span>
+                    )}
+                    <div className={`rounded-2xl px-4 py-2.5 ${isA ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-muted rounded-tl-sm border border-border/50 text-foreground'}`}>
+                      {msg.isDeleted ? (
+                        <p className="text-sm italic opacity-60">Сообщение удалено</p>
+                      ) : (
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground mt-1 opacity-60">
+                      {parseApiDate(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="p-4 bg-card border-t border-border/50 text-center text-sm text-amber-600 font-medium">
+        <Eye className="w-4 h-4 inline mr-2" />
+        Режим просмотра — отправка сообщений недоступна
+      </div>
+    </div>
+  );
+}
+
 function AttachmentPreview({ url, type, name, size, isMe }: { url: string, type: any, name: string, size: number | null, isMe: boolean }) {
   const displaySize = size ? `${(size / 1024 / 1024).toFixed(2)} MB` : '';
   
@@ -359,7 +614,6 @@ function AttachmentPreview({ url, type, name, size, isMe }: { url: string, type:
     );
   }
 
-  // File
   return (
     <a 
       href={url} 
@@ -386,12 +640,14 @@ function NewConversationDialog({ onSelect }: { onSelect: (id: number) => void })
   
   const startSupport = useStartSupportConversation();
   const startDirect = useStartDirectConversation();
+  const queryClient = useQueryClient();
   const { data: users, isLoading } = useListChatUsers({ q: search }, { query: { queryKey: ['users', search] } });
 
   const handleSupport = () => {
     startSupport.mutate(undefined, {
       onSuccess: (res) => {
         setOpen(false);
+        queryClient.invalidateQueries({ queryKey: getListConversationsQueryKey() });
         onSelect(res.id);
       }
     });
@@ -401,6 +657,7 @@ function NewConversationDialog({ onSelect }: { onSelect: (id: number) => void })
     startDirect.mutate({ data: { targetClerkId: clerkUserId } }, {
       onSuccess: (res) => {
         setOpen(false);
+        queryClient.invalidateQueries({ queryKey: getListConversationsQueryKey() });
         onSelect(res.id);
       }
     });
@@ -440,7 +697,7 @@ function NewConversationDialog({ onSelect }: { onSelect: (id: number) => void })
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input 
-                placeholder="Поиск по имени..." 
+                placeholder="Поиск по имени или email..." 
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="pl-9 bg-background"
@@ -475,6 +732,75 @@ function NewConversationDialog({ onSelect }: { onSelect: (id: number) => void })
                 ))
               )}
             </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Super-admin user picker: search users and pick one to view their chats */
+function SuperAdminUserPickerDialog({ onSelectUser }: { onSelectUser: (clerkUserId: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const { data: users, isLoading } = useListChatUsers({ q: search }, { query: { queryKey: ['admin-user-search', search] } });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="rounded-full gap-2 border-amber-500/50 text-amber-600 hover:bg-amber-500/10">
+          <Eye className="w-4 h-4" /> <span className="hidden sm:inline">Просмотр чатов</span>
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md bg-card border-border">
+        <DialogHeader>
+          <DialogTitle className="font-serif text-2xl flex items-center gap-2">
+            <Eye className="w-5 h-5 text-amber-600" />
+            Просмотр переписки пользователя
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground mt-1">Доступно только super-admin (владельцу). Выберите пользователя для просмотра.</p>
+        
+        <div className="mt-4 space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input 
+              placeholder="Поиск по имени или email..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9 bg-background"
+            />
+          </div>
+          
+          <div className="max-h-[360px] overflow-y-auto space-y-2 pr-2">
+            {isLoading ? (
+              <div className="py-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+            ) : users?.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">Пользователи не найдены</div>
+            ) : (
+              users?.map(u => (
+                <button
+                  key={u.clerkUserId}
+                  onClick={() => {
+                    onSelectUser(u.clerkUserId);
+                    setOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-border bg-background hover:border-amber-500/50 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="w-10 h-10 border border-border">
+                      <AvatarImage src={u.avatarUrl || ''} />
+                      <AvatarFallback><UserCircle className="w-6 h-6 text-muted-foreground" /></AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-bold text-sm text-foreground">{u.name}</p>
+                      <p className="text-xs text-muted-foreground">{u.email}</p>
+                    </div>
+                  </div>
+                  <Eye className="w-4 h-4 text-amber-500 opacity-60" />
+                </button>
+              ))
+            )}
           </div>
         </div>
       </DialogContent>

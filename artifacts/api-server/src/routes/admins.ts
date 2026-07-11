@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
-import { eq, count } from "drizzle-orm";
+import { eq, count, or } from "drizzle-orm";
 import { clerkClient } from "@clerk/express";
-import { db, adminsTable } from "@workspace/db";
+import { db, adminsTable, conversationsTable, chatMessagesTable, chatMessageDeletionsTable, appUsersTable } from "@workspace/db";
 import {
   ListAdminsResponse,
   CreateAdminBody,
@@ -193,11 +193,65 @@ router.post("/admins/clerk-users/:id/unban", requireAdmin, async (req, res): Pro
   }
 });
 
-// DELETE /admins/clerk-users/:id
+// DELETE /admins/clerk-users/:id — cascade: remove from admins, delete chats/messages
 router.delete("/admins/clerk-users/:id", requireOwner, async (req, res): Promise<void> => {
-  const id = String(req.params.id);
+  const clerkId = String(req.params.id);
   try {
-    await clerkClient.users.deleteUser(id);
+    // 1) Remove from admins table (strips any admin rights immediately)
+    await db.delete(adminsTable).where(eq(adminsTable.clerkUserId, clerkId));
+
+    // 2) Find all conversations this user participates in
+    const userConvs = await db
+      .select({ id: conversationsTable.id })
+      .from(conversationsTable)
+      .where(
+        or(
+          eq(conversationsTable.userAClerkId, clerkId),
+          eq(conversationsTable.userBClerkId, clerkId),
+        ),
+      );
+
+    const convIds = userConvs.map((c) => c.id);
+
+    if (convIds.length > 0) {
+      // 3) Delete per-user hidden-message rows for deleted user's messages in those convs
+      await db
+        .delete(chatMessageDeletionsTable)
+        .where(eq(chatMessageDeletionsTable.clerkUserId, clerkId));
+
+      // 4) Delete all messages in those conversations (affects both sides)
+      for (const convId of convIds) {
+        // Remove deletion-tracking rows for messages in this conversation
+        const msgs = await db
+          .select({ id: chatMessagesTable.id })
+          .from(chatMessagesTable)
+          .where(eq(chatMessagesTable.conversationId, convId));
+        for (const msg of msgs) {
+          await db
+            .delete(chatMessageDeletionsTable)
+            .where(eq(chatMessageDeletionsTable.messageId, msg.id));
+        }
+        await db
+          .delete(chatMessagesTable)
+          .where(eq(chatMessagesTable.conversationId, convId));
+      }
+
+      // 5) Delete the conversations themselves
+      for (const convId of convIds) {
+        await db
+          .delete(conversationsTable)
+          .where(eq(conversationsTable.id, convId));
+      }
+    }
+
+    // 6) Remove from app_users mirror table
+    await db
+      .delete(appUsersTable)
+      .where(eq(appUsersTable.clerkUserId, clerkId));
+
+    // 7) Finally delete from Clerk
+    await clerkClient.users.deleteUser(clerkId);
+
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Failed to delete user" });

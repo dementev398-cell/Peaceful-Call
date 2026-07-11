@@ -1,14 +1,26 @@
+import { useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ScrollReveal } from './ScrollReveal';
 import { useContentDict } from '@/hooks/use-content';
-import { Heart, ExternalLink } from 'lucide-react';
+import { Heart, ExternalLink, Copy, Check } from 'lucide-react';
 
 export function Donate() {
   const { t, isRtl } = useLanguage();
   const { dict } = useContentDict();
+  const [copied, setCopied] = useState(false);
 
   const qrImage = dict['donation.qr_image'] || '/donate-qr.png';
   const walletNote = dict['donation.wallet_note'] || 'USDT (TRC20)';
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(walletNote);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard API unavailable; silently ignore.
+    }
+  };
 
   return (
     <section id="donate" className="py-24 md:py-32 relative overflow-hidden" dir="ltr">
@@ -50,11 +62,32 @@ export function Donate() {
                 />
               </div>
 
-              <div className="bg-background/80 glass px-6 py-3 rounded-full border border-border/50 shadow-inner">
+              <p className="text-xs md:text-sm text-muted-foreground uppercase tracking-[0.15em] font-semibold -mt-2">
+                {t('support.scanHint')}
+              </p>
+
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="group flex items-center gap-3 bg-background/80 glass px-6 py-3 rounded-full border border-border/50 shadow-inner hover:border-primary/40 transition-all"
+              >
                 <span className="font-mono text-sm md:text-base font-semibold text-foreground tracking-widest drop-shadow-sm">
                   {walletNote}
                 </span>
-              </div>
+                <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-primary">
+                  {copied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      {t('support.copied')}
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 transition-opacity" />
+                      {t('support.copyAddress')}
+                    </>
+                  )}
+                </span>
+              </button>
 
               {/* Primary donation button */}
               <a

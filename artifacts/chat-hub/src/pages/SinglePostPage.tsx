@@ -1,7 +1,8 @@
 import { parseApiDate } from "@/lib/date";
 import { PageTransition } from '@/components/PageTransition';
 import { useState } from 'react';
-import { useGetPostBySlug, useGetPostInteractions, useCreatePostComment, useDeletePostComment, useReactToPost } from '@workspace/api-client-react';
+import { useGetPostBySlug, useGetPostInteractions, useCreatePostComment, useDeletePostComment, useReactToPost, getGetPostInteractionsQueryKey } from '@workspace/api-client-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'wouter';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
@@ -53,7 +54,7 @@ export default function SinglePostPage() {
 
               <div className="flex flex-wrap items-center gap-3 mb-6">
                 <span className="px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-bold tracking-widest uppercase border border-primary/20">
-                  {t('posts.title').slice(0,-1) || 'Статья'}
+                  {t('posts.singular')}
                 </span>
                 <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Calendar className="w-4 h-4 opacity-70" />
@@ -118,19 +119,28 @@ export default function SinglePostPage() {
 function PostInteractions({ postId }: { postId: number }) {
   const { t, isRtl } = useLanguage();
   const { isSignedIn, user } = useUser();
-  const { data: interactions, isLoading } = useGetPostInteractions(postId);
+  const queryClient = useQueryClient();
+  const { data: interactions, isLoading } = useGetPostInteractions(postId, {
+    query: { queryKey: getGetPostInteractionsQueryKey(postId), refetchInterval: 12000 } // poll every 12s for new comments from other users
+  });
   const reactMut = useReactToPost();
   const addComment = useCreatePostComment();
   const deleteComment = useDeletePostComment();
   const { toast } = useToast();
   const [commentText, setCommentText] = useState('');
 
+  const invalidateInteractions = () => {
+    queryClient.invalidateQueries({ queryKey: getGetPostInteractionsQueryKey(postId) });
+  };
+
   const handleReact = (type: 'like' | 'dislike') => {
     if (!isSignedIn) {
       toast({ title: t('post.signInToComment'), variant: 'destructive' });
       return;
     }
-    reactMut.mutate({ id: postId, data: { type } });
+    reactMut.mutate({ id: postId, data: { type } }, {
+      onSuccess: () => invalidateInteractions(),
+    });
   };
 
   const handleComment = async () => {
@@ -139,6 +149,7 @@ function PostInteractions({ postId }: { postId: number }) {
       await addComment.mutateAsync({ id: postId, data: { content: commentText } });
       setCommentText('');
       toast({ title: '✓', description: isRtl ? 'تم إرسال التعليق' : 'Комментарий отправлен' });
+      invalidateInteractions();
     } catch {
       toast({ title: 'Ошибка', variant: 'destructive' });
     }
@@ -148,6 +159,7 @@ function PostInteractions({ postId }: { postId: number }) {
     if (!confirm(isRtl ? 'هل تريد حذف التعليق؟' : 'Удалить комментарий?')) return;
     try {
       await deleteComment.mutateAsync({ id: postId, commentId });
+      invalidateInteractions();
     } catch {
       toast({ title: 'Ошибка', variant: 'destructive' });
     }

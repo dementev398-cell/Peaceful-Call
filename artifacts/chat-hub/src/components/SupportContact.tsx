@@ -21,15 +21,15 @@ export function SupportContact() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.senderName || !form.content) {
-      toast({ title: 'Please fill in your name and message.', variant: 'destructive' });
+      toast({ title: t('contact.form.validationError'), variant: 'destructive' });
       return;
     }
     try {
       await send.mutateAsync({ data: form });
       setSent(true);
-      toast({ title: 'Message sent!', description: 'We will reply to you soon.' });
+      toast({ title: t('contact.form.sentToast'), description: t('contact.form.sentToastDesc') });
     } catch {
-      toast({ title: 'Failed to send', description: 'Please try again.', variant: 'destructive' });
+      toast({ title: t('contact.form.failedTitle'), description: t('contact.form.failedDesc'), variant: 'destructive' });
     }
   };
 
@@ -50,51 +50,51 @@ export function SupportContact() {
               {sent ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
                   <CheckCircle className="w-16 h-16 text-primary mb-4" />
-                  <h4 className="text-xl font-serif font-bold mb-2">Message sent!</h4>
-                  <p className="text-muted-foreground">We'll get back to you soon.</p>
+                  <h4 className="text-xl font-serif font-bold mb-2">{t('contact.form.sentTitle')}</h4>
+                  <p className="text-muted-foreground">{t('contact.form.sentDesc')}</p>
                   <Button variant="outline" onClick={() => { setSent(false); setForm({ senderName: '', senderEmail: '', subject: '', content: '' }); }} className="mt-6 rounded-full">
-                    Send another
+                    {t('contact.form.sendAnother')}
                   </Button>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="flex-1 flex flex-col gap-4">
+                <form onSubmit={handleSubmit} className="flex-1 flex flex-col gap-4" dir={isRtl ? 'rtl' : 'ltr'}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">Your Name *</label>
+                      <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">{t('contact.form.nameLabel')}</label>
                       <Input
                         value={form.senderName}
                         onChange={e => setForm({ ...form, senderName: e.target.value })}
-                        placeholder="Ahmad Hassan"
+                        placeholder={t('contact.form.namePlaceholder')}
                         className="bg-card border-border/70 focus:border-primary/50 h-11"
                         required
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">Email</label>
+                      <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">{t('contact.form.emailLabel')}</label>
                       <Input
                         type="email"
                         value={form.senderEmail}
                         onChange={e => setForm({ ...form, senderEmail: e.target.value })}
-                        placeholder="your@email.com"
+                        placeholder={t('contact.form.emailPlaceholder')}
                         className="bg-card border-border/70 focus:border-primary/50 h-11"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">Subject</label>
+                    <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">{t('contact.form.subjectLabel')}</label>
                     <Input
                       value={form.subject}
                       onChange={e => setForm({ ...form, subject: e.target.value })}
-                      placeholder="What's on your mind?"
+                      placeholder={t('contact.form.subjectPlaceholder')}
                       className="bg-card border-border/70 focus:border-primary/50 h-11"
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">Message *</label>
+                    <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">{t('contact.form.messageLabel')}</label>
                     <Textarea
                       value={form.content}
                       onChange={e => setForm({ ...form, content: e.target.value })}
-                      placeholder="Write your question or message here..."
+                      placeholder={t('contact.form.messagePlaceholder')}
                       className="bg-card border-border/70 focus:border-primary/50 min-h-[140px] resize-none"
                       required
                     />

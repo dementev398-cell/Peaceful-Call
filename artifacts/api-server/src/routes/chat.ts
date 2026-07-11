@@ -11,6 +11,7 @@ import {
   type Conversation,
 } from "@workspace/db";
 import { requireAppUser } from "../middlewares/appUser";
+import { requireOwner } from "../middlewares/adminAuth";
 import {
   ListConversationsResponse,
   StartSupportConversationResponse,
@@ -681,6 +682,168 @@ router.post(
         forwardedFromSenderName: newMessage.forwardedFromSenderName ?? null,
       }),
     );
+  },
+);
+
+// ── Super-admin: list any user's conversations ────────────────────────────────
+// GET /chat/admin/users/:clerkUserId/conversations  — owner only
+router.get(
+  "/chat/admin/users/:clerkUserId/conversations",
+  requireOwner,
+  async (req, res): Promise<void> => {
+    const targetClerkId = String(req.params.clerkUserId);
+
+    const rows = await db
+      .select()
+      .from(conversationsTable)
+      .where(
+        or(
+          eq(conversationsTable.userAClerkId, targetClerkId),
+          eq(conversationsTable.userBClerkId, targetClerkId),
+        ),
+      )
+      .orderBy(desc(conversationsTable.lastMessageAt));
+
+    const clerkIds = new Set<string>();
+    for (const c of rows) {
+      clerkIds.add(c.userAClerkId);
+      if (c.userBClerkId) clerkIds.add(c.userBClerkId);
+    }
+    const allIds = Array.from(clerkIds);
+    const others = allIds.length
+      ? await db
+          .select()
+          .from(appUsersTable)
+          .where(inArray(appUsersTable.clerkUserId, allIds))
+      : [];
+    const othersById = new Map(others.map((u) => [u.clerkUserId, u]));
+
+    const profiles = allIds.length
+      ? await db
+          .select()
+          .from(userProfilesTable)
+          .where(inArray(userProfilesTable.clerkUserId, allIds))
+      : [];
+    const profilesByClerkId = new Map(profiles.map((p) => [p.clerkUserId, p]));
+
+    const result = rows.map((c) => {
+      const isA = c.userAClerkId === targetClerkId;
+      const otherId = isA ? c.userBClerkId : c.userAClerkId;
+      const other = otherId ? othersById.get(otherId) ?? null : null;
+      const otherProfile = otherId ? profilesByClerkId.get(otherId) ?? null : null;
+      const otherNickname = otherProfile?.nickname ?? null;
+      const otherAvatar = otherProfile?.avatarUrl ?? other?.avatarUrl ?? null;
+      const otherName = otherNickname || other?.name || other?.email || "Администрация";
+      const lastReadAt = isA ? c.lastReadAtA : c.lastReadAtB;
+      const unread = !lastReadAt || c.lastMessageAt > lastReadAt;
+
+      return {
+        id: c.id,
+        kind: c.kind,
+        title: c.kind === "support" && isA ? "Администрация" : otherName,
+        otherAvatarUrl: otherAvatar,
+        lastMessageAt: c.lastMessageAt,
+        lastMessagePreview: c.lastMessagePreview,
+        unread,
+      };
+    });
+
+    res.json(ListConversationsResponse.parse(result));
+  },
+);
+
+// ── Super-admin: list messages in any conversation ────────────────────────────
+// GET /chat/admin/conversations/:id/messages  — owner only
+router.get(
+  "/chat/admin/conversations/:id/messages",
+  requireOwner,
+  async (req, res): Promise<void> => {
+    const id = parseInt(req.params.id as string, 10);
+    const [convo] = await db
+      .select()
+      .from(conversationsTable)
+      .where(eq(conversationsTable.id, id));
+    if (!convo) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+
+    const messages = await db
+      .select()
+      .from(chatMessagesTable)
+      .where(eq(chatMessagesTable.conversationId, id))
+      .orderBy(asc(chatMessagesTable.createdAt));
+
+    if (messages.length === 0) {
+      res.json(ListChatMessagesResponse.parse([]));
+      return;
+    }
+
+    const senderIds = Array.from(new Set(messages.map((m) => m.senderClerkId)));
+    const senderProfiles = await db
+      .select()
+      .from(userProfilesTable)
+      .where(inArray(userProfilesTable.clerkUserId, senderIds));
+    const profileBySenderId = new Map(senderProfiles.map((p) => [p.clerkUserId, p]));
+
+    const senderAppUsers = await db
+      .select()
+      .from(appUsersTable)
+      .where(inArray(appUsersTable.clerkUserId, senderIds));
+    const appUserBySenderId = new Map(senderAppUsers.map((u) => [u.clerkUserId, u]));
+
+    const result = messages.map((m) => {
+      const profile = profileBySenderId.get(m.senderClerkId) ?? null;
+      const appUser = appUserBySenderId.get(m.senderClerkId) ?? null;
+      const displayName =
+        profile?.nickname || m.senderName || appUser?.name || appUser?.email || "";
+      const displayAvatar =
+        profile?.avatarUrl || m.senderAvatarUrl || appUser?.avatarUrl || null;
+
+      if (m.isDeleted) {
+        return {
+          id: m.id,
+          conversationId: m.conversationId,
+          senderClerkId: m.senderClerkId,
+          senderName: displayName,
+          senderNickname: profile?.nickname ?? null,
+          senderAvatarUrl: displayAvatar,
+          senderIsAdmin: m.senderIsAdmin,
+          content: null,
+          attachmentUrl: null,
+          attachmentType: null,
+          attachmentName: null,
+          attachmentMimeType: null,
+          attachmentSize: null,
+          isDeleted: true,
+          isForwarded: m.isForwarded,
+          forwardedFromSenderName: m.forwardedFromSenderName ?? null,
+          createdAt: m.createdAt,
+        };
+      }
+
+      return {
+        id: m.id,
+        conversationId: m.conversationId,
+        senderClerkId: m.senderClerkId,
+        senderName: displayName,
+        senderNickname: profile?.nickname ?? null,
+        senderAvatarUrl: displayAvatar,
+        senderIsAdmin: m.senderIsAdmin,
+        content: m.content ?? null,
+        attachmentUrl: m.attachmentUrl ?? null,
+        attachmentType: m.attachmentType ?? null,
+        attachmentName: m.attachmentName ?? null,
+        attachmentMimeType: m.attachmentMimeType ?? null,
+        attachmentSize: m.attachmentSize ?? null,
+        isDeleted: false,
+        isForwarded: m.isForwarded,
+        forwardedFromSenderName: m.forwardedFromSenderName ?? null,
+        createdAt: m.createdAt,
+      };
+    });
+
+    res.json(ListChatMessagesResponse.parse(result));
   },
 );
 

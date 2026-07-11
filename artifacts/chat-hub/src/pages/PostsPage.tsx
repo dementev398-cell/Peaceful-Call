@@ -155,7 +155,7 @@ export default function PostsPage() {
                       <div className="p-7 flex-1 flex flex-col" dir={isRtl ? 'rtl' : 'ltr'}>
                         <div className="flex items-center gap-3 mb-4">
                           <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold tracking-widest uppercase border border-primary/20">
-                            {t('posts.title').slice(0, -1) || 'Статья'}
+                            {t('posts.singular')}
                           </span>
                           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <Calendar className="w-3.5 h-3.5" />

@@ -73,7 +73,7 @@ const clerkAppearance = {
     footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
     headerTitle: 'font-serif text-3xl font-bold tracking-tight',
     headerSubtitle: '!text-[hsl(220_12%_65%)] font-serif text-sm mt-1',
-    formButtonPrimary: 'rounded-full h-12 text-sm font-bold tracking-widest uppercase transition-all glow-gold shadow-lg shadow-primary/20',
+    formButtonPrimary: 'rounded-full h-12 text-sm font-bold tracking-widest uppercase transition-all glow-gold shadow-lg shadow-primary/20 !text-[hsl(224_24%_4%)] hover:!brightness-110 hover:scale-[1.02] active:scale-[0.98]',
     socialButtonsBlockButton: 'rounded-xl h-12 !border-white/10 !text-[hsl(40_10%_96%)] hover:!bg-white/5 hover:!border-white/20 transition-all',
     socialButtonsBlockButtonText: '!text-[hsl(40_10%_96%)] font-semibold',
     formFieldInput: 'rounded-xl h-12 !bg-[hsl(224_20%_8%)] !border-white/10 hover:!border-white/20 focus:!border-[hsl(43_85%_58%)] focus:!ring-1 focus:!ring-[hsl(43_85%_58%)] transition-all shadow-inner',
@@ -260,8 +260,49 @@ function ClerkProviderWithRoutes() {
       signUpSubtitle: 'انضم إلى المجتمع',
     },
   }[language];
+  // @clerk/localizations deliberately leaves some field placeholders as
+  // `undefined` for RU/AR (they fall back to English at render time), which
+  // is why the email/password/name inputs showed English text even when the
+  // rest of the UI was in Russian or Arabic. We fill those gaps explicitly.
+  const placeholderOverrides = {
+    RU: {
+      emailAddress: 'Введите ваш email',
+      password: 'Введите ваш пароль',
+      signUpPassword: 'Придумайте пароль',
+      firstName: 'Имя',
+      lastName: 'Фамилия',
+      username: 'Имя пользователя',
+    },
+    EN: undefined,
+    AR: {
+      emailAddress: 'أدخل بريدك الإلكتروني',
+      password: 'أدخل كلمة المرور',
+      signUpPassword: 'أنشئ كلمة مرور',
+      firstName: 'الاسم الأول',
+      lastName: 'اسم العائلة',
+      username: 'اسم المستخدم',
+    },
+  }[language];
   const clerkLocalization = {
     ...baseLocalization,
+    formFieldInputPlaceholder__emailAddress:
+      placeholderOverrides?.emailAddress ??
+      baseLocalization.formFieldInputPlaceholder__emailAddress,
+    formFieldInputPlaceholder__password:
+      placeholderOverrides?.password ??
+      baseLocalization.formFieldInputPlaceholder__password,
+    formFieldInputPlaceholder__signUpPassword:
+      placeholderOverrides?.signUpPassword ??
+      baseLocalization.formFieldInputPlaceholder__signUpPassword,
+    formFieldInputPlaceholder__firstName:
+      placeholderOverrides?.firstName ??
+      baseLocalization.formFieldInputPlaceholder__firstName,
+    formFieldInputPlaceholder__lastName:
+      placeholderOverrides?.lastName ??
+      baseLocalization.formFieldInputPlaceholder__lastName,
+    formFieldInputPlaceholder__username:
+      placeholderOverrides?.username ??
+      baseLocalization.formFieldInputPlaceholder__username,
     signIn: {
       ...baseLocalization.signIn,
       start: {

@@ -21,7 +21,7 @@ export function NicknameGate({ children }: { children: React.ReactNode }) {
   });
   const updateProfile = useUpdateMyProfile();
   const { toast } = useToast();
-  const { isRtl } = useLanguage();
+  const { t, isRtl } = useLanguage();
   const [nickname, setNickname] = useState('');
 
   // While loading, show children to avoid flash
@@ -47,10 +47,15 @@ export function NicknameGate({ children }: { children: React.ReactNode }) {
     try {
       await updateProfile.mutateAsync({ data: { nickname: nickname.trim() } });
       await refetch();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const apiErr = err as { status?: number; message?: string } | null;
+      const description =
+        apiErr?.status === 409
+          ? t('nickname.taken')
+          : apiErr?.message || t('nickname.error');
       toast({
-        title: isRtl ? 'خطأ' : 'Ошибка',
-        description: err?.message || 'Failed',
+        title: t('nickname.error'),
+        description,
         variant: 'destructive',
       });
     }
@@ -72,12 +77,10 @@ export function NicknameGate({ children }: { children: React.ReactNode }) {
           </div>
 
           <h2 className="text-2xl font-serif font-bold mb-3 text-foreground">
-            {isRtl ? 'اختر اسمك المستعار' : 'Выберите никнейм'}
+            {t('nickname.title')}
           </h2>
           <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
-            {isRtl
-              ? 'سيظهر هذا الاسم في التعليقات والرسائل. يمكنك تغييره مرة واحدة كل 30 يومًا.'
-              : 'Это имя будет отображаться в комментариях и сообщениях. Менять можно раз в 30 дней.'}
+            {t('nickname.desc')}
           </p>
 
           <div className="space-y-4">
@@ -87,7 +90,7 @@ export function NicknameGate({ children }: { children: React.ReactNode }) {
                 value={nickname}
                 onChange={e => setNickname(e.target.value)}
                 maxLength={32}
-                placeholder={isRtl ? 'اسمك هنا...' : 'Ваш никнейм...'}
+                placeholder={t('nickname.placeholder')}
                 className="pl-11 bg-background/50 border-primary/20 focus:border-primary/50 rounded-xl h-12 text-base"
                 autoFocus
                 onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
@@ -102,7 +105,7 @@ export function NicknameGate({ children }: { children: React.ReactNode }) {
               {updateProfile.isPending
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : null}
-              {isRtl ? 'تأكيد' : 'Продолжить'}
+              {t('nickname.confirm')}
             </Button>
           </div>
         </motion.div>

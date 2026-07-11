@@ -21,7 +21,7 @@ export default function ProfilePage() {
       <main className="flex-grow container mx-auto px-6 py-24 sm:py-32 max-w-4xl flex flex-col items-center">
         <div className="w-full flex justify-start mb-8" dir={isRtl ? 'rtl' : 'ltr'}>
           <Link href="/portal" className="text-muted-foreground hover:text-primary transition-colors flex items-center text-sm font-medium">
-            <ArrowLeft className={`w-4 h-4 mr-2 ${isRtl ? 'rotate-180 ml-2 mr-0' : 'mr-2'}`} /> {t('auth.backHome')}
+            <ArrowLeft className={`w-4 h-4 ${isRtl ? 'rotate-180 ml-2' : 'mr-2'}`} /> {t('auth.backHome')}
           </Link>
         </div>
 
@@ -40,7 +40,7 @@ export default function ProfilePage() {
 }
 
 function CustomProfileSection() {
-  const { isRtl } = useLanguage();
+  const { t, language, isRtl } = useLanguage();
   const { data: profile, isLoading, refetch } = useGetMyProfile();
   const updateProfile = useUpdateMyProfile();
   const requestUploadUrl = useRequestUploadUrl();
@@ -60,7 +60,14 @@ function CustomProfileSection() {
 
   if (!profile) return null;
 
-  const nicknameNeverChanged = profile.nicknameUpdatedAt === profile.createdAt;
+  // Compare as timestamps (ms) to avoid string-format differences between
+  // createdAt and nicknameUpdatedAt from the DB.
+  const nicknameNeverChanged =
+    Math.abs(
+      new Date(profile.nicknameUpdatedAt).getTime() -
+      new Date(profile.createdAt).getTime()
+    ) < 2000; // within 2 seconds → treat as "never manually changed"
+
   const lastChangeMs = new Date(profile.nicknameUpdatedAt).getTime();
   const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
   const cooldownExpires = new Date(lastChangeMs + thirtyDaysMs);
@@ -77,27 +84,52 @@ function CustomProfileSection() {
   };
 
   const handleSaveNickname = async () => {
-    if (!nickname.trim()) return;
+    const trimmed = nickname.trim();
+    if (!trimmed) return;
+    // Prevent no-op save
+    if (trimmed === profile.nickname) {
+      setIsEditingNickname(false);
+      return;
+    }
     try {
-      await updateProfile.mutateAsync({ data: { nickname: nickname.trim() } });
-      toast({ title: '✓', description: isRtl ? 'تم تحديث الاسم المستعار' : 'Никнейм обновлён' });
+      await updateProfile.mutateAsync({ data: { nickname: trimmed } });
+      toast({ title: '✓', description: t('profile.nicknameSaved') });
       setIsEditingNickname(false);
       refetch();
-    } catch (err: any) {
-      const msg: string = err?.message || '';
-      const dateMatch = msg.match(/after (.+)\./);
-      if (dateMatch) {
-        const d = new Date(dateMatch[1]);
+    } catch (err: unknown) {
+      const apiErr = err as { status?: number; data?: { error?: string }; message?: string } | null;
+      const status = apiErr?.status;
+      const msg: string = apiErr?.message || '';
+
+      if (status === 409) {
+        // Nickname already taken — show friendly localised message
         toast({
-          title: isRtl ? 'لا يمكن التغيير الآن' : 'Смена недоступна',
-          description: isRtl
-            ? `يمكنك تغيير اللقب بعد ${d.toLocaleDateString('ar')}`
-            : `Доступно с ${d.toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' })}`,
+          title: t('nickname.error'),
+          description: t('nickname.taken'),
           variant: 'destructive',
         });
-      } else {
-        toast({ title: 'Ошибка', description: msg, variant: 'destructive' });
+        return;
       }
+
+      // Cooldown: server embeds the next-allowed date in the message
+      const dateMatch = msg.match(/after (.+)\./);
+      if (status === 429 || dateMatch) {
+        const dateStr = dateMatch ? dateMatch[1] : null;
+        const d = dateStr ? new Date(dateStr) : cooldownExpires;
+        const formattedDate = language === 'AR'
+          ? d.toLocaleDateString('ar')
+          : language === 'EN'
+            ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+            : d.toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' });
+        toast({
+          title: t('profile.cooldownTitle'),
+          description: t('profile.cooldownDesc').replace('{date}', formattedDate),
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({ title: t('nickname.error'), description: msg || t('profile.saveError'), variant: 'destructive' });
     }
   };
 
@@ -110,12 +142,13 @@ function CustomProfileSection() {
         data: { name: file.name, size: file.size, contentType: file.type },
       });
       const putRes = await fetch(uploadURL, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
-      if (!putRes.ok) throw new Error('Upload failed');
+      if (!putRes.ok) throw new Error(t('profile.uploadFailed'));
       await updateProfile.mutateAsync({ data: { avatarUrl: objectPath } });
-      toast({ title: '✓', description: isRtl ? 'تم تحديث الصورة' : 'Аватар обновлён' });
-      refetch();
-    } catch (err: any) {
-      toast({ title: 'Ошибка', description: err.message, variant: 'destructive' });
+      toast({ title: '✓', description: t('profile.avatarSaved') });
+      await refetch();
+    } catch (err: unknown) {
+      const e = err as { message?: string } | null;
+      toast({ title: t('nickname.error'), description: e?.message || t('profile.saveError'), variant: 'destructive' });
     } finally {
       setIsUploadingAvatar(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -125,10 +158,11 @@ function CustomProfileSection() {
   const handleRemoveAvatar = async () => {
     try {
       await updateProfile.mutateAsync({ data: { avatarUrl: null } });
-      toast({ title: '✓', description: isRtl ? 'تمت إزالة الصورة' : 'Аватар удалён' });
-      refetch();
-    } catch (err: any) {
-      toast({ title: 'Ошибка', description: err.message, variant: 'destructive' });
+      toast({ title: '✓', description: t('profile.avatarRemoved') });
+      await refetch();
+    } catch (err: unknown) {
+      const e = err as { message?: string } | null;
+      toast({ title: t('nickname.error'), description: e?.message || t('profile.saveError'), variant: 'destructive' });
     }
   };
 
@@ -141,8 +175,8 @@ function CustomProfileSection() {
           <User className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <h2 className="text-xl font-serif font-bold">{isRtl ? 'ملفي الشخصي' : 'Мой профиль'}</h2>
-          <p className="text-xs text-muted-foreground">{isRtl ? 'اللقب والصورة الرمزية' : 'Никнейм и аватар'}</p>
+          <h2 className="text-xl font-serif font-bold">{t('profile.title')}</h2>
+          <p className="text-xs text-muted-foreground">{t('profile.subtitle')}</p>
         </div>
       </div>
 
@@ -150,7 +184,8 @@ function CustomProfileSection() {
         {/* Avatar block */}
         <div className="flex flex-col items-center gap-3 flex-shrink-0">
           <div className="relative group">
-            <Avatar className="w-24 h-24 border-2 border-primary/30 shadow-lg">
+            {/* key forces AvatarImage to re-mount when src changes, clearing browser cache */}
+            <Avatar key={avatarSrc} className="w-24 h-24 border-2 border-primary/30 shadow-lg">
               <AvatarImage src={avatarSrc} />
               <AvatarFallback className="bg-primary/10 text-primary text-2xl font-serif font-bold">
                 {profile.nickname.charAt(0).toUpperCase()}
@@ -181,7 +216,7 @@ function CustomProfileSection() {
               className="rounded-full text-xs gap-1.5 w-full bg-primary text-primary-foreground font-semibold hover:brightness-110"
             >
               {isUploadingAvatar ? <Loader2 className="w-3 h-3 animate-spin" /> : <Camera className="w-3 h-3" />}
-              {isRtl ? 'تغيير الصورة' : 'Загрузить'}
+              {t('profile.uploadAvatar')}
             </Button>
             {profile.avatarUrl && (
               <Button
@@ -192,7 +227,7 @@ function CustomProfileSection() {
                 className="rounded-full text-xs text-muted-foreground hover:text-destructive gap-1.5 w-full"
               >
                 <X className="w-3 h-3" />
-                {isRtl ? 'إزالة' : 'Удалить'}
+                {t('profile.removeAvatar')}
               </Button>
             )}
           </div>
@@ -202,7 +237,7 @@ function CustomProfileSection() {
         <div className="flex-1 min-w-0">
           <div className="mb-3">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              {isRtl ? 'الاسم المستعار' : 'Никнейм'}
+              {t('profile.nicknameLabel')}
             </label>
           </div>
 
@@ -214,19 +249,24 @@ function CustomProfileSection() {
                 maxLength={32}
                 className="bg-background/50 border-primary/30 focus:border-primary/60 rounded-xl"
                 autoFocus
-                onKeyDown={e => { if (e.key === 'Enter') handleSaveNickname(); if (e.key === 'Escape') cancelEdit(); }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleSaveNickname();
+                  if (e.key === 'Escape') cancelEdit();
+                }}
               />
               <div className="flex gap-2">
                 <Button
                   onClick={handleSaveNickname}
-                  disabled={!nickname.trim() || updateProfile.isPending || isCoolingDown}
+                  disabled={!nickname.trim() || updateProfile.isPending}
                   className="rounded-full gap-2 text-sm h-9 bg-primary text-primary-foreground font-semibold hover:brightness-110"
                 >
-                  {updateProfile.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  {isRtl ? 'حفظ' : 'Сохранить'}
+                  {updateProfile.isPending
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Check className="w-3.5 h-3.5" />}
+                  {t('admin.save')}
                 </Button>
                 <Button variant="ghost" onClick={cancelEdit} className="rounded-full text-sm h-9">
-                  {isRtl ? 'إلغاء' : 'Отмена'}
+                  {t('admin.cancel')}
                 </Button>
               </div>
             </div>
@@ -241,22 +281,27 @@ function CustomProfileSection() {
                   disabled={isCoolingDown}
                   className="rounded-full text-xs h-8 px-3"
                 >
-                  {isRtl ? 'تعديل' : 'Изменить'}
+                  {t('admin.edit')}
                 </Button>
               </div>
               {isCoolingDown && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-xl px-3 py-2 border border-border/30">
                   <Clock className="w-3.5 h-3.5 flex-shrink-0 text-primary/60" />
                   <span>
-                    {isRtl
-                      ? `يمكنك تغيير اللقب بعد ${cooldownExpires.toLocaleDateString('ar')}`
-                      : `Смена никнейма доступна с ${cooldownExpires.toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' })}`}
+                    {t('profile.cooldownDesc').replace(
+                      '{date}',
+                      language === 'AR'
+                        ? cooldownExpires.toLocaleDateString('ar')
+                        : language === 'EN'
+                          ? cooldownExpires.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+                          : cooldownExpires.toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' })
+                    )}
                   </span>
                 </div>
               )}
               {!isCoolingDown && !nicknameNeverChanged && (
                 <p className="text-xs text-muted-foreground">
-                  {isRtl ? 'يمكن تغييره مرة كل 30 يومًا' : 'Можно менять раз в 30 дней'}
+                  {t('profile.cooldownHint')}
                 </p>
               )}
             </div>

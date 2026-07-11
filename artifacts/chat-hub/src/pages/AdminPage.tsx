@@ -19,6 +19,7 @@ import {
   useListAdmins,
   useCreateAdmin,
   useDeleteAdmin,
+  useUpdateAdminRole,
   useListMessages,
   useGetMessage,
   getGetMessageQueryKey,
@@ -36,11 +37,21 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Loader2, LogOut, Plus, Trash2, Edit2, Check, X,
   Mail, MailOpen, Reply, MessageCircle, Crown, Shield,
   ShieldAlert, LogIn, Users, Ban,
   ChevronLeft, FileText, Settings, LayoutDashboard,
-  ScrollText, Paperclip, Film, Camera
+  ScrollText, Paperclip, Film, Camera, ShieldCheck, ShieldOff
 } from 'lucide-react';
 import { useClerk, useUser } from '@clerk/react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -49,6 +60,57 @@ import { useContentDict } from '@/hooks/use-content';
 import { attachmentSrc, getAttachmentType, resolvePostCover } from '@/lib/storage';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { motion } from 'framer-motion';
+
+// ── Reusable Confirm Dialog ───────────────────────────────────────────────────
+function ConfirmDialog({
+  open,
+  title,
+  description,
+  confirmLabel,
+  confirmVariant = 'destructive',
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel?: string;
+  confirmVariant?: 'destructive' | 'default';
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const { t } = useLanguage();
+  return (
+    <AlertDialog open={open}>
+      <AlertDialogContent className="glass border border-border/50 rounded-2xl shadow-2xl max-w-md">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="font-serif text-lg">{title}</AlertDialogTitle>
+          <AlertDialogDescription className="text-sm text-muted-foreground leading-relaxed">
+            {description}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="gap-2 mt-2">
+          <AlertDialogCancel
+            onClick={onCancel}
+            className="rounded-full h-9 text-sm border-border/50"
+          >
+            {t('admin.cancel')}
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={onConfirm}
+            className={`rounded-full h-9 text-sm font-semibold ${
+              confirmVariant === 'destructive'
+                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                : 'bg-primary text-primary-foreground hover:bg-primary/90'
+            }`}
+          >
+            {confirmLabel ?? t('admin.delete')}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 
 async function clerkFetch(path: string, options: RequestInit = {}) {
   const res = await fetch(path, {
@@ -117,7 +179,7 @@ export default function AdminPage() {
         </div>
         <h2 className="text-2xl font-serif font-bold mb-3">{t('admin.accessDenied')}</h2>
         <p className="text-muted-foreground text-sm mb-7">{t('admin.accessDeniedDesc')}</p>
-        <Button variant="outline" onClick={() => signOut({ redirectUrl: '/' })} className="w-full h-11 rounded-full">
+        <Button variant="outline" onClick={() => signOut().then(() => setLocation('/'))} className="w-full h-11 rounded-full">
           {t('admin.signOut')}
         </Button>
       </AdminGateShell>
@@ -152,7 +214,12 @@ export default function AdminPage() {
           <div className="flex items-center gap-3 flex-shrink-0">
             <span className="text-xs text-muted-foreground hidden md:block truncate max-w-[180px]">{user.email}</span>
             <AdminAvatarWidget adminId={user.id ?? 0} />
-            <Button variant="ghost" size="sm" onClick={() => signOut({ redirectUrl: '/' })} className="gap-1.5 text-muted-foreground hover:text-foreground h-9 rounded-xl border border-transparent hover:border-border/50">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => signOut().then(() => setLocation('/'))}
+              className="gap-1.5 text-muted-foreground hover:text-foreground hover:text-destructive h-9 rounded-xl border border-transparent hover:border-destructive/30 hover:bg-destructive/8 transition-all"
+            >
               <LogOut className="w-3.5 h-3.5" />
               <span className="hidden sm:inline text-xs font-semibold">{t('admin.signOut')}</span>
             </Button>
@@ -318,12 +385,17 @@ function AdminAvatarWidget({ adminId }: { adminId: number }) {
 }
 
 // ── Users Manager ────────────────────────────────────────────────────────────
+type PendingAction =
+  | { type: 'ban'; userId: string; isBanned: boolean; name: string }
+  | { type: 'delete'; userId: string; name: string };
+
 function UsersManager() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { toast } = useToast();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingAction | null>(null);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -331,7 +403,7 @@ function UsersManager() {
       const data = await clerkFetch('/api/admins/clerk-users');
       setUsers(data);
     } catch (e: any) {
-      toast({ title: t('error') || 'Error', description: e.message, variant: 'destructive' });
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -339,8 +411,7 @@ function UsersManager() {
 
   useEffect(() => { loadUsers(); }, []);
 
-  const handleBan = async (userId: string, isBanned: boolean) => {
-    if (!confirm(isBanned ? t('admin.confirmBan') : t('admin.confirmBan'))) return;
+  const executeBan = async (userId: string, isBanned: boolean) => {
     setActionLoading(userId + '_ban');
     try {
       await clerkFetch(`/api/admins/clerk-users/${userId}/${isBanned ? 'unban' : 'ban'}`, { method: 'POST' });
@@ -353,8 +424,7 @@ function UsersManager() {
     }
   };
 
-  const handleDelete = async (userId: string, name: string) => {
-    if (!confirm(t('admin.confirmDelete'))) return;
+  const executeDelete = async (userId: string) => {
     setActionLoading(userId + '_del');
     try {
       await clerkFetch(`/api/admins/clerk-users/${userId}`, { method: 'DELETE' });
@@ -367,104 +437,154 @@ function UsersManager() {
     }
   };
 
+  const handleConfirm = async () => {
+    if (!pending) return;
+    const p = pending;
+    setPending(null);
+    if (p.type === 'ban') await executeBan(p.userId, p.isBanned);
+    else await executeDelete(p.userId);
+  };
+
+  const refreshLabel = language === 'RU' ? 'Обновить' : language === 'AR' ? 'تحديث' : 'Refresh';
+
   if (loading) return (
-    <div className="flex justify-center py-16">
-      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+    <div className="flex justify-center py-20">
+      <Loader2 className="w-7 h-7 animate-spin text-primary" />
     </div>
   );
 
   return (
     <div className="space-y-6">
+      {/* Confirm Dialog */}
+      {pending && (
+        <ConfirmDialog
+          open={!!pending}
+          title={
+            pending.type === 'delete'
+              ? t('admin.confirmDelete').split('?')[0] + '?'
+              : pending.isBanned
+                ? t('admin.confirmBan').replace(/\?$/, '') + '?'
+                : t('admin.confirmBan').replace(/ban/i, 'Unban').replace(/заблокировать/i, 'Разблокировать') + '?'
+          }
+          description={
+            pending.type === 'delete'
+              ? t('admin.confirmDelete')
+              : t('admin.confirmBan')
+          }
+          confirmLabel={
+            pending.type === 'delete'
+              ? t('admin.deleteUser')
+              : pending.isBanned
+                ? t('admin.unbanUser')
+                : t('admin.banUser')
+          }
+          confirmVariant={pending.type === 'delete' ? 'destructive' : 'default'}
+          onConfirm={handleConfirm}
+          onCancel={() => setPending(null)}
+        />
+      )}
+
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h3 className="text-xl font-serif font-bold">{t('admin.userMgmt')}</h3>
           <p className="text-sm text-muted-foreground mt-1">{t('admin.userMgmtDesc')}</p>
         </div>
-        <Button variant="outline" size="sm" onClick={loadUsers} className="rounded-full text-xs gap-1.5">
-          <Loader2 className="w-3.5 h-3.5" />
-          {t('admin.back') === 'Назад' ? 'Обновить' : 'Refresh'}
+        <Button variant="outline" size="sm" onClick={loadUsers} disabled={loading} className="rounded-full text-xs gap-1.5 h-8">
+          <Loader2 className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          {refreshLabel}
         </Button>
       </div>
 
       {users.length === 0 ? (
-        <div className="text-center py-16 bg-card border border-dashed border-border rounded-2xl">
-          <Users className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
-          <p className="text-muted-foreground">{t('admin.noUsers')}</p>
+        <div className="text-center py-20 bg-card/40 border border-dashed border-border/50 rounded-2xl">
+          <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/20" />
+          <p className="text-muted-foreground font-serif">{t('admin.noUsers')}</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {users.map((u) => (
-            <motion.div
-              key={u.id}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`flex items-center gap-3 p-4 rounded-xl border transition-colors ${
-                u.banned ? 'bg-destructive/5 border-destructive/20' : 'bg-card border-border/50 hover:border-border'
-              }`}
-            >
-              {/* Avatar */}
-              <div className="w-9 h-9 rounded-full overflow-hidden bg-muted border border-border flex-shrink-0">
-                {u.imageUrl ? (
-                  <img src={u.imageUrl} alt={u.firstName} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-sm font-bold text-muted-foreground">
-                    {(u.firstName || u.email || '?').charAt(0).toUpperCase()}
-                  </div>
-                )}
-              </div>
-
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold text-foreground truncate">
-                    {[u.firstName, u.lastName].filter(Boolean).join(' ') || 'Anonymous'}
-                  </span>
-                  {u.banned && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/10 text-destructive text-[10px] font-bold uppercase tracking-wider border border-destructive/20">
-                      <Ban className="w-2.5 h-2.5" />
-                      {t('admin.banned')}
-                    </span>
+        <div className="rounded-2xl border border-border/40 bg-card/30 overflow-hidden">
+          <div className="px-4 py-3 border-b border-border/40 bg-muted/10 flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              {t('admin.userMgmt')}
+            </span>
+            <span className="text-xs text-muted-foreground">{users.length}</span>
+          </div>
+          <div className="divide-y divide-border/30">
+            {users.map((u, idx) => (
+              <motion.div
+                key={u.id}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.03 }}
+                className={`flex items-center gap-3 px-4 py-3 transition-colors group ${
+                  u.banned
+                    ? 'bg-destructive/3 hover:bg-destructive/5'
+                    : 'hover:bg-muted/20'
+                }`}
+              >
+                {/* Avatar */}
+                <div className="w-9 h-9 rounded-full overflow-hidden bg-muted border border-border flex-shrink-0 shadow-sm">
+                  {u.imageUrl ? (
+                    <img src={u.imageUrl} alt={u.firstName} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-sm font-bold text-muted-foreground bg-primary/10">
+                      {(u.firstName || u.email || '?').charAt(0).toUpperCase()}
+                    </div>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground truncate">{u.email}</p>
-              </div>
 
-              {/* Actions */}
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleBan(u.id, u.banned)}
-                  disabled={actionLoading === u.id + '_ban'}
-                  className={`h-8 px-3 rounded-lg text-xs font-medium gap-1.5 ${
-                    u.banned
-                      ? 'text-green-500 hover:bg-green-500/10 hover:text-green-400'
-                      : 'text-orange-400 hover:bg-orange-400/10'
-                  }`}
-                >
-                  {actionLoading === u.id + '_ban' ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Ban className="w-3.5 h-3.5" />
-                  )}
-                  <span className="hidden sm:inline">{u.banned ? t('admin.unbanUser') : t('admin.banUser')}</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDelete(u.id, u.firstName)}
-                  disabled={actionLoading === u.id + '_del'}
-                  className="h-8 px-3 rounded-lg text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                >
-                  {actionLoading === u.id + '_del' ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-3.5 h-3.5" />
-                  )}
-                </Button>
-              </div>
-            </motion.div>
-          ))}
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-foreground truncate">
+                      {[u.firstName, u.lastName].filter(Boolean).join(' ') || 'Anonymous'}
+                    </span>
+                    {u.banned && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/10 text-destructive text-[10px] font-bold uppercase tracking-wider border border-destructive/20">
+                        <Ban className="w-2.5 h-2.5" />
+                        {t('admin.banned')}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 flex-shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPending({ type: 'ban', userId: u.id, isBanned: u.banned, name: u.firstName })}
+                    disabled={!!actionLoading}
+                    className={`h-8 px-2.5 rounded-lg text-xs font-medium gap-1.5 transition-all ${
+                      u.banned
+                        ? 'text-emerald-500 hover:bg-emerald-500/10'
+                        : 'text-amber-500 hover:bg-amber-500/10'
+                    }`}
+                  >
+                    {actionLoading === u.id + '_ban' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Ban className="w-3.5 h-3.5" />
+                    )}
+                    <span className="hidden sm:inline">{u.banned ? t('admin.unbanUser') : t('admin.banUser')}</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPending({ type: 'delete', userId: u.id, name: u.firstName || u.email })}
+                    disabled={!!actionLoading}
+                    className="h-8 w-8 rounded-lg text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-all"
+                  >
+                    {actionLoading === u.id + '_del' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3.5 h-3.5" />
+                    )}
+                  </Button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -1002,7 +1122,7 @@ function PostsManager() {
           </div>
           {editingPost.coverImageUrl && (
             <div className="rounded-xl overflow-hidden border border-border/40 h-40 relative group">
-              <img src={editingPost.coverImageUrl} alt="Cover preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              <img src={attachmentSrc(editingPost.coverImageUrl)} alt="Cover preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               <button
                 type="button"
                 onClick={() => setEditingPost({...editingPost, coverImageUrl: ''})}
@@ -1289,14 +1409,23 @@ function HadithsManager() {
 }
 
 // ── Admins Manager ────────────────────────────────────────────────────────────
+type AdminPendingAction =
+  | { type: 'grant'; id: number; name: string }
+  | { type: 'revoke'; id: number; name: string }
+  | { type: 'transfer'; id: number; name: string }
+  | { type: 'remove'; id: number; name: string };
+
 function AdminsManager() {
   const { data: me } = useGetMe();
   const { data: admins = [], isLoading, refetch } = useListAdmins();
   const create = useCreateAdmin();
   const remove = useDeleteAdmin();
+  const updateRole = useUpdateAdminRole();
   const { toast } = useToast();
   const { t } = useLanguage();
   const [newAdmin, setNewAdmin] = useState({ email: '', role: 'editor' as 'editor' | 'owner' });
+  const [pending, setPending] = useState<AdminPendingAction | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   if (isLoading) return <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
 
@@ -1304,7 +1433,7 @@ function AdminsManager() {
     if (!newAdmin.email) return;
     try {
       await create.mutateAsync({ data: newAdmin });
-      toast({ title: '✓' });
+      toast({ title: '✓', description: newAdmin.email });
       setNewAdmin({ email: '', role: 'editor' });
       refetch();
     } catch (error: any) {
@@ -1312,50 +1441,81 @@ function AdminsManager() {
     }
   };
 
-  const handleDelete = async (id: number, name: string) => {
-    if (!confirm(`${t('admin.delete')} "${name}"?`)) return;
+  const handleConfirm = async () => {
+    if (!pending) return;
+    const p = pending;
+    setPending(null);
+    setActionLoading(true);
     try {
-      await remove.mutateAsync({ id });
-      refetch();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    }
-  };
-
-  const handleTransferOwner = async (id: number, name: string) => {
-    if (!confirm(t('admin.transferOwner') + ` "${name}"?`)) return;
-    try {
-      await clerkFetch(`/api/admins/${id}/role`, {
-        method: 'PATCH',
-        body: JSON.stringify({ role: 'owner', transferOwnership: true }),
-      });
+      if (p.type === 'remove') {
+        await remove.mutateAsync({ id: p.id });
+      } else if (p.type === 'grant') {
+        await updateRole.mutateAsync({ id: p.id, data: { role: 'owner' } });
+      } else if (p.type === 'revoke') {
+        await updateRole.mutateAsync({ id: p.id, data: { role: 'editor' } });
+      } else if (p.type === 'transfer') {
+        await clerkFetch(`/api/admins/${p.id}/role`, {
+          method: 'PATCH',
+          body: JSON.stringify({ role: 'owner', transferOwnership: true }),
+        });
+      }
       toast({ title: '✓' });
       refetch();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    }
-  };
-
-  const handleMakeAdmin = async (id: number, currentRole: string) => {
-    const newRole = currentRole === 'editor' ? 'owner' : 'editor';
-    try {
-      await clerkFetch(`/api/admins/${id}/role`, {
-        method: 'PATCH',
-        body: JSON.stringify({ role: newRole }),
-      });
-      toast({ title: '✓' });
-      refetch();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const isMeOwner = me?.role === 'owner';
 
+  const dialogConfig = pending ? (() => {
+    switch (pending.type) {
+      case 'grant': return {
+        title: t('admin.grantAdmin'),
+        description: t('admin.confirmGrantAdmin') + ` "${pending.name}"`,
+        label: t('admin.grantAdmin'),
+        variant: 'default' as const,
+      };
+      case 'revoke': return {
+        title: t('admin.revokeAdmin'),
+        description: t('admin.confirmRevokeAdmin') + ` "${pending.name}"`,
+        label: t('admin.revokeAdmin'),
+        variant: 'destructive' as const,
+      };
+      case 'transfer': return {
+        title: t('admin.transferOwner'),
+        description: t('admin.confirmTransferOwner') + ` "${pending.name}"`,
+        label: t('admin.transferOwner'),
+        variant: 'destructive' as const,
+      };
+      case 'remove': return {
+        title: t('admin.delete'),
+        description: t('admin.confirmRemoveAdmin') + ` "${pending.name}"`,
+        label: t('admin.delete'),
+        variant: 'destructive' as const,
+      };
+    }
+  })() : null;
+
   return (
     <div className="space-y-7">
+      {/* Confirm Dialog */}
+      {pending && dialogConfig && (
+        <ConfirmDialog
+          open={!!pending}
+          title={dialogConfig.title}
+          description={dialogConfig.description}
+          confirmLabel={dialogConfig.label}
+          confirmVariant={dialogConfig.variant}
+          onConfirm={handleConfirm}
+          onCancel={() => setPending(null)}
+        />
+      )}
+
       {isMeOwner && (
-        <div className="p-4 rounded-2xl bg-primary/6 border border-primary/18 flex gap-3 items-start">
+        <div className="p-4 rounded-2xl bg-primary/6 border border-primary/15 flex gap-3 items-start">
           <Crown className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
           <p className="text-sm text-foreground/75">
             <span className="font-bold text-primary">{t('admin.youOwner')}</span>{' '}
@@ -1366,8 +1526,11 @@ function AdminsManager() {
 
       {/* Invite form */}
       {isMeOwner && (
-        <div className="bg-card border border-border/40 rounded-2xl p-5">
-          <h4 className="text-sm font-bold mb-4">{t('admin.inviteAdmin')}</h4>
+        <div className="bg-card border border-border/40 rounded-2xl p-5 shadow-sm">
+          <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-primary" />
+            {t('admin.inviteAdmin')}
+          </h4>
           <div className="flex flex-col sm:flex-row gap-3">
             <Input
               value={newAdmin.email}
@@ -1394,59 +1557,119 @@ function AdminsManager() {
       )}
 
       {/* Admins list */}
-      <div className="space-y-2">
-        {admins.map((admin) => {
-          const isCurrentMe = me?.id === admin.id;
-          const isOwner = admin.role === 'owner';
+      <div className="rounded-2xl border border-border/40 bg-card/30 overflow-hidden shadow-sm">
+        <div className="px-4 py-3 border-b border-border/40 bg-muted/10 flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <Shield className="w-3.5 h-3.5" />
+            {t('admin.admins')}
+          </span>
+          <span className="text-xs text-muted-foreground">{admins.length}</span>
+        </div>
+        <div className="divide-y divide-border/30">
+          {admins.map((admin, idx) => {
+            const isCurrentMe = me?.id === admin.id;
+            const isAdminOwner = admin.role === 'owner';
 
-          return (
-            <div key={admin.id} className={`flex items-center gap-3 p-4 rounded-xl border transition-colors ${isCurrentMe ? 'border-primary/25 bg-primary/4' : 'border-border/40 bg-card/50 hover:border-border'}`}>
-              <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-                {isOwner
-                  ? <Crown className="w-4 h-4 text-primary" />
-                  : <Shield className="w-4 h-4 text-primary/60" />
-                }
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold text-foreground truncate">
-                    {admin.name || admin.email}
-                    {isCurrentMe && <span className="ml-1.5 text-primary font-bold text-xs">({t('nav.manageAccount').split(' ')[0]})</span>}
-                  </span>
-                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                    isOwner
-                      ? 'bg-primary/10 text-primary border-primary/20'
-                      : 'bg-muted text-muted-foreground border-border/50'
-                  }`}>
-                    {isOwner ? t('admin.roleOwner') : t('admin.roleEditor')}
-                  </span>
+            return (
+              <motion.div
+                key={admin.id}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.04 }}
+                className={`flex items-center gap-3 px-4 py-3.5 transition-colors group ${
+                  isCurrentMe
+                    ? 'bg-primary/4'
+                    : 'hover:bg-muted/15'
+                }`}
+              >
+                {/* Role icon */}
+                <div className={`w-9 h-9 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                  isAdminOwner
+                    ? 'bg-primary/10 border-primary/30 glow-gold-sm'
+                    : 'bg-muted/40 border-border/50'
+                }`}>
+                  {isAdminOwner
+                    ? <Crown className="w-4 h-4 text-primary" />
+                    : <Shield className="w-4 h-4 text-muted-foreground" />
+                  }
                 </div>
-                <p className="text-xs text-muted-foreground truncate">{admin.email}</p>
-              </div>
 
-              {isMeOwner && !isCurrentMe && (
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  {!isOwner && (
-                    <Button variant="ghost" size="sm" onClick={() => handleMakeAdmin(admin.id, admin.role)} className="h-8 rounded-lg text-xs text-muted-foreground hover:text-primary hover:bg-primary/8 gap-1.5 px-3">
-                      <Crown className="w-3 h-3" />
-                      <span className="hidden sm:inline">{t('admin.makeAdmin')}</span>
-                    </Button>
-                  )}
-                  {isOwner && (
-                    <Button variant="ghost" size="sm" onClick={() => handleTransferOwner(admin.id, admin.name)} className="h-8 rounded-lg text-xs text-muted-foreground hover:text-primary hover:bg-primary/8 gap-1.5 px-3">
-                      <Crown className="w-3 h-3" />
-                      <span className="hidden sm:inline">{t('admin.transferOwner')}</span>
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(admin.id, admin.name)} className="h-8 w-8 rounded-lg text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-foreground truncate">
+                      {admin.name || admin.email}
+                    </span>
+                    {isCurrentMe && (
+                      <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
+                        (you)
+                      </span>
+                    )}
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                      isAdminOwner
+                        ? 'bg-primary/10 text-primary border-primary/25'
+                        : 'bg-muted/60 text-muted-foreground border-border/50'
+                    }`}>
+                      {isAdminOwner ? t('admin.roleOwner') : t('admin.roleEditor')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">{admin.email}</p>
                 </div>
-              )}
-            </div>
-          );
-        })}
+
+                {/* Actions — only owner sees these, and not for themselves */}
+                {isMeOwner && !isCurrentMe && (
+                  <div className="flex items-center gap-1 flex-shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
+                    {!isAdminOwner ? (
+                      // Editor → grant admin / promote
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPending({ type: 'grant', id: admin.id, name: admin.name || admin.email })}
+                        disabled={actionLoading}
+                        className="h-8 rounded-lg text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 gap-1.5 px-2.5 transition-all"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">{t('admin.grantAdmin')}</span>
+                      </Button>
+                    ) : (
+                      // Owner → revoke / transfer
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPending({ type: 'revoke', id: admin.id, name: admin.name || admin.email })}
+                          disabled={actionLoading}
+                          className="h-8 rounded-lg text-xs text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 gap-1.5 px-2.5 transition-all"
+                        >
+                          <ShieldOff className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">{t('admin.revokeAdmin')}</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPending({ type: 'transfer', id: admin.id, name: admin.name || admin.email })}
+                          disabled={actionLoading}
+                          className="h-8 rounded-lg text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 gap-1.5 px-2.5 transition-all"
+                        >
+                          <Crown className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">{t('admin.transferOwner')}</span>
+                        </Button>
+                      </>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setPending({ type: 'remove', id: admin.id, name: admin.name || admin.email })}
+                      disabled={actionLoading}
+                      className="h-8 w-8 rounded-lg text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
