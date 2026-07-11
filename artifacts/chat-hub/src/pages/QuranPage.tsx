@@ -68,13 +68,13 @@ function SurahPicker({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="w-full flex items-center justify-between gap-3 h-12 px-4 rounded-xl bg-card/60 border border-border/50 hover:border-primary/40 transition-colors text-left group"
+        className="w-full min-w-0 flex items-center justify-between gap-3 h-12 px-4 rounded-xl bg-card/60 border border-border/50 hover:border-primary/40 transition-colors text-left group overflow-hidden"
       >
-        <span className="flex items-center gap-2.5 min-w-0">
+        <span className="flex items-center gap-2.5 min-w-0 flex-1">
           <span className="flex items-center justify-center w-7 h-7 shrink-0 rounded-lg bg-primary/15 text-primary text-xs font-bold">
             {value}
           </span>
-          <span className="truncate font-semibold text-foreground">
+          <span className="min-w-0 flex-1 truncate font-semibold text-foreground">
             {current ? (lang === 'AR' ? current.ar : current.tr) : ''}
             {current && lang !== 'AR' && (
               <span className="text-muted-foreground font-normal"> — {lang === 'RU' ? current.ru : current.en}</span>
@@ -196,14 +196,14 @@ export default function QuranPage() {
 
           {/* Controls */}
           <ScrollReveal delay="100">
-            <div className="sticky top-20 z-20 mb-8 grid sm:grid-cols-2 gap-3 p-3 rounded-2xl glass-strong border border-border/40 shadow-lg">
-              <div>
+            <div className="sticky top-20 z-20 mb-8 grid sm:grid-cols-2 gap-3 p-3 rounded-2xl glass-strong border border-border/40 shadow-lg overflow-hidden">
+              <div className="min-w-0">
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 px-1">
                   {t('quran.selectSurah')}
                 </label>
                 <SurahPicker value={surahNumber} onChange={goTo} lang={uiLang} t={t} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 px-1">
                   {t('quran.translation')}
                 </label>
