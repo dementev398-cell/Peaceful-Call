@@ -38,7 +38,7 @@ export function Hero() {
   // Fade starts later and finishes right as the section scrolls away, so the CTA
   // buttons (posts + donate) stay fully clickable for most of the scroll instead
   // of vanishing the instant the user starts scrolling.
-  const opacityText = useTransform(scrollYProgress, [0.35, 1], [1, 0]);
+  const opacityText = useTransform(scrollYProgress, [0.8, 1], [1, 0]);
 
   const pills = [
     t('pill.meaning'),
