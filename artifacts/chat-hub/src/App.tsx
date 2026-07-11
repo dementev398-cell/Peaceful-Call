@@ -11,6 +11,7 @@ import SinglePostPage from '@/pages/SinglePostPage';
 import PostsPage from '@/pages/PostsPage';
 import MessagesPage from '@/pages/MessagesPage';
 import HadithsPage from '@/pages/HadithsPage';
+import QuranPage from '@/pages/QuranPage';
 import SingleHadithPage from '@/pages/SingleHadithPage';
 import { Route, Switch, Router as WouterRouter, useLocation, Link } from 'wouter';
 import { ClerkProvider, SignIn, SignUp, Show, useClerk } from '@clerk/react';
@@ -205,6 +206,7 @@ function Router() {
           <Route path="/posts/:slug" component={SinglePostPage} />
           <Route path="/hadiths" component={HadithsPage} />
           <Route path="/hadiths/:id" component={SingleHadithPage} />
+          <Route path="/quran" component={QuranPage} />
 
           <Route path="/portal">
             <Show when="signed-in">

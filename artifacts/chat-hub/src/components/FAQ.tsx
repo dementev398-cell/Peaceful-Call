@@ -25,18 +25,17 @@ export function FAQ() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.04),transparent_40%)] pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,hsl(var(--primary)/0.03),transparent_40%)] pointer-events-none" />
       
-      <div className="container mx-auto px-6 max-w-5xl relative z-10">
-        <div className="grid lg:grid-cols-12 gap-12 lg:gap-20 items-start">
-          <div className="lg:col-span-5 lg:sticky lg:top-32" dir={isRtl ? 'rtl' : 'ltr'}>
-            <ScrollReveal>
-              <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-foreground tracking-tight drop-shadow-sm leading-[1.1]">
-                {t('faq.title')}
-              </h2>
-              <div className="w-20 h-1 bg-gradient-to-r from-primary to-transparent mt-8 rounded-full opacity-80"></div>
-            </ScrollReveal>
-          </div>
+      <div className="container mx-auto px-6 max-w-3xl relative z-10">
+        <div className="text-center mb-14" dir={isRtl ? 'rtl' : 'ltr'}>
+          <ScrollReveal>
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-foreground tracking-tight drop-shadow-sm leading-[1.1]" dir="auto">
+              {t('faq.title')}
+            </h2>
+            <div className="w-20 h-1 bg-gradient-to-r from-transparent via-primary to-transparent mt-6 mx-auto rounded-full opacity-80"></div>
+          </ScrollReveal>
+        </div>
 
-          <div className="lg:col-span-7" dir={isRtl ? 'rtl' : 'ltr'}>
+        <div dir={isRtl ? 'rtl' : 'ltr'}>
             <Accordion type="single" collapsible className="w-full space-y-4">
               {faqs.map((faq, idx) => (
                 <ScrollReveal key={idx} delay={(idx * 100).toString()}>
@@ -59,7 +58,6 @@ export function FAQ() {
                 </ScrollReveal>
               ))}
             </Accordion>
-          </div>
         </div>
       </div>
     </section>

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useContentDict } from '@/hooks/use-content';
 import { SignOutButton, useUser } from '@clerk/react';
 import { UserMenu } from './UserMenu';
-import { Menu, X, LogOut, BookOpen, ScrollText, Users, HelpCircle } from 'lucide-react';
+import { Menu, X, LogOut, BookOpen, ScrollText, Users, HelpCircle, BookMarked } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGetMe } from '@workspace/api-client-react';
 
@@ -77,6 +77,10 @@ export function Navbar() {
           <Link href="/hadiths" className="text-xs font-bold tracking-widest text-muted-foreground hover:text-primary transition-colors uppercase flex items-center gap-1.5">
             <ScrollText className="w-3.5 h-3.5" />
             {t('nav.hadiths')}
+          </Link>
+          <Link href="/quran" className="text-xs font-bold tracking-widest text-muted-foreground hover:text-primary transition-colors uppercase flex items-center gap-1.5">
+            <BookMarked className="w-3.5 h-3.5" />
+            {t('nav.quran')}
           </Link>
         </nav>
 
@@ -167,6 +171,10 @@ export function Navbar() {
             <Link href="/hadiths" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 text-base font-semibold tracking-widest text-muted-foreground hover:text-primary transition-colors uppercase py-3 border-b border-border/20">
               <ScrollText className="w-5 h-5 text-primary/70" />
               {t('nav.hadiths')}
+            </Link>
+            <Link href="/quran" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 text-base font-semibold tracking-widest text-muted-foreground hover:text-primary transition-colors uppercase py-3 border-b border-border/20">
+              <BookMarked className="w-5 h-5 text-primary/70" />
+              {t('nav.quran')}
             </Link>
             <div className="pt-4">
               {isSignedIn ? (

@@ -3,4 +3,5 @@
 - [Peaceful Call FAQ i18n](peaceful-call-faq-i18n.md) — home FAQ stores manual RU/EN/AR jsonb maps (RU required); not AI-translated because user declined AI key; edit via OpenAPI codegen, not hand-edited generated files.
 - [Clerk + wouter logout gotcha](peaceful-call-clerk-quirks.md) — `signOut()` without `redirectUrl` sends users to Clerk's own sign-in URL, not your app route; causes blank-page-until-reload bugs when combined with `AnimatePresence mode="wait"`.
 - [Clerk theme CSS override](peaceful-call-clerk-quirks.md) — Clerk's own CSS layer wins over normal Tailwind/app classes; override Clerk elements (e.g. `.cl-badge`) with unlayered CSS rules, not `@layer` rules.
+- [Peaceful Call Quran reader](peaceful-call-quran.md) — /quran fetches live from api.alquran.cloud; Shidfar/Gafurov don't exist in reliable sources (replaced w/ Sablukov+Muntahab); map ayah↔translation by number, never index.
 - [Peaceful Call bidi punctuation bug](peaceful-call-bidi-punctuation.md) — global RTL dir on `<html>` reorders trailing punctuation in unrelated LTR text; fix with `dir="auto"` on raw text containers, not ancestor dir.

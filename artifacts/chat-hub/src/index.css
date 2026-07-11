@@ -1,9 +1,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..800;1,400..800&family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
+
+/* Quranic Arabic script — beautiful naskh, isolated so it never affects Latin/Cyrillic UI. */
+.font-quran {
+  font-family: 'Amiri', 'Scheherazade New', 'Traditional Arabic', serif;
+  line-height: 2.1;
+}
 
 /* Hide Clerk's footer branding row ("Secured by Clerk" / the "Development mode" dev badge).
    `cl-footerItem` is Clerk's stable class for the bottom branding row; the sign-up/sign-in
