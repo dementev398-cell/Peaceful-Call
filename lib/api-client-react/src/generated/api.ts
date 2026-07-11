@@ -31,12 +31,12 @@ import type {
   ClerkUserSummary,
   CommentInput,
   DeleteChatMessageParams,
+  EditChatMessageInput,
   ErrorPayload,
   FaqInput,
   FaqItem,
   FaqUpdate,
   ForwardChatMessageInput,
-  EditChatMessageInput,
   GetMePayload,
   GetMessagePayload,
   GetUnreadCountPayload,
@@ -3662,6 +3662,78 @@ export const useMarkConversationRead = <TError = ErrorType<unknown>,
       return useMutation(getMarkConversationReadMutationOptions(options));
     }
 
+export const getEditChatMessageUrl = (id: number,) => {
+
+
+
+
+  return `/api/chat/messages/${id}`
+}
+
+/**
+ * @summary Edit a chat message (sender only)
+ */
+export const editChatMessage = async (id: number,
+    editChatMessageInput: EditChatMessageInput, options?: RequestInit): Promise<ChatMessage> => {
+
+  return customFetch<ChatMessage>(getEditChatMessageUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(editChatMessageInput)
+  }
+);}
+
+
+
+
+
+export const getEditChatMessageMutationOptions = <TError = ErrorType<ErrorPayload>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editChatMessage>>, TError,{id: number;data: BodyType<EditChatMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof editChatMessage>>, TError,{id: number;data: BodyType<EditChatMessageInput>}, TContext> => {
+
+const mutationKey = ['editChatMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof editChatMessage>>, {id: number;data: BodyType<EditChatMessageInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  editChatMessage(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EditChatMessageMutationResult = NonNullable<Awaited<ReturnType<typeof editChatMessage>>>
+    export type EditChatMessageMutationBody = BodyType<EditChatMessageInput>
+    export type EditChatMessageMutationError = ErrorType<ErrorPayload>
+
+    /**
+ * @summary Edit a chat message (sender only)
+ */
+export const useEditChatMessage = <TError = ErrorType<ErrorPayload>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editChatMessage>>, TError,{id: number;data: BodyType<EditChatMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof editChatMessage>>,
+        TError,
+        {id: number;data: BodyType<EditChatMessageInput>},
+        TContext
+      > => {
+      return useMutation(getEditChatMessageMutationOptions(options));
+    }
+
 export const getDeleteChatMessageUrl = (id: number,
     params?: DeleteChatMessageParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -3812,76 +3884,6 @@ export const useForwardChatMessage = <TError = ErrorType<ErrorPayload>,
         TContext
       > => {
       return useMutation(getForwardChatMessageMutationOptions(options));
-    }
-
-export const getEditChatMessageUrl = (id: number,) => {
-
-
-
-
-  return `/api/chat/messages/${id}`
-}
-
-/**
- * @summary Edit a chat message
- */
-export const editChatMessage = async (id: number,
-    editChatMessageInput: EditChatMessageInput, options?: RequestInit): Promise<ChatMessage> => {
-
-  return customFetch<ChatMessage>(getEditChatMessageUrl(id),
-  {
-    ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(editChatMessageInput)
-  }
-);}
-
-
-
-
-
-export const getEditChatMessageMutationOptions = <TError = ErrorType<ErrorPayload>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editChatMessage>>, TError,{id: number;data: BodyType<EditChatMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof editChatMessage>>, TError,{id: number;data: BodyType<EditChatMessageInput>}, TContext> => {
-
-const mutationKey = ['editChatMessage'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof editChatMessage>>, {id: number;data: BodyType<EditChatMessageInput>}> = (props) => {
-          const {id,data} = props ?? {};
-
-          return  editChatMessage(id,data,requestOptions)
-        }
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type EditChatMessageMutationResult = NonNullable<Awaited<ReturnType<typeof editChatMessage>>>
-    export type EditChatMessageMutationBody = BodyType<EditChatMessageInput>
-    export type EditChatMessageMutationError = ErrorType<ErrorPayload>
-
-    /**
- * @summary Edit a chat message
- */
-export const useEditChatMessage = <TError = ErrorType<ErrorPayload>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editChatMessage>>, TError,{id: number;data: BodyType<EditChatMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof editChatMessage>>,
-        TError,
-        {id: number;data: BodyType<EditChatMessageInput>},
-        TContext
-      > => {
-      return useMutation(getEditChatMessageMutationOptions(options));
     }
 
 export const getGetHadithInteractionsUrl = (id: number,) => {

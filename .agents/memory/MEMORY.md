@@ -1,4 +1,5 @@
 - [Peaceful Call restore](peaceful-call-restore.md) — restored from a full project backup zip; original archive had an Orval params-collision bug, fixed pattern documented there.
 - [Peaceful Call i18n](peaceful-call-i18n.md) — real localization system is `LanguageContext.tsx` (RU/EN/AR, `t()`), not the legacy `src/lib/i18n.ts`; Clerk locale files silently fall back to English for several placeholder keys.
+- [Peaceful Call FAQ i18n](peaceful-call-faq-i18n.md) — home FAQ stores manual RU/EN/AR jsonb maps (RU required); not AI-translated because user declined AI key; edit via OpenAPI codegen, not hand-edited generated files.
 - [Clerk + wouter logout gotcha](peaceful-call-clerk-quirks.md) — `signOut()` without `redirectUrl` sends users to Clerk's own sign-in URL, not your app route; causes blank-page-until-reload bugs when combined with `AnimatePresence mode="wait"`.
 - [Clerk theme CSS override](peaceful-call-clerk-quirks.md) — Clerk's own CSS layer wins over normal Tailwind/app classes; override Clerk elements (e.g. `.cl-badge`) with unlayered CSS rules, not `@layer` rules.

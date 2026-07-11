@@ -5,11 +5,10 @@
  * Стильный призыв API
  * OpenAPI spec version: 0.1.0
  */
+import type { FaqTranslations } from './faqTranslations';
 
 export interface FaqUpdate {
-  /** @minLength 1 */
-  question?: string;
-  /** @minLength 1 */
-  answer?: string;
+  questionI18n?: FaqTranslations;
+  answerI18n?: FaqTranslations;
   order?: number;
 }

@@ -91,6 +91,16 @@ export const ListFaqResponseItem = zod.object({
   "id": zod.number(),
   "question": zod.string(),
   "answer": zod.string(),
+  "questionI18n": zod.object({
+  "ru": zod.string().optional(),
+  "en": zod.string().optional(),
+  "ar": zod.string().optional()
+}).describe('Manual per-language text (RU \/ EN \/ AR).'),
+  "answerI18n": zod.object({
+  "ru": zod.string().optional(),
+  "en": zod.string().optional(),
+  "ar": zod.string().optional()
+}).describe('Manual per-language text (RU \/ EN \/ AR).'),
   "order": zod.number(),
   "createdAt": zod.string()
 })
@@ -100,13 +110,17 @@ export const ListFaqResponse = zod.array(ListFaqResponseItem)
 /**
  * @summary Create a FAQ item (admin only)
  */
-
-
-
-
 export const CreateFaqBody = zod.object({
-  "question": zod.string().min(1),
-  "answer": zod.string().min(1),
+  "questionI18n": zod.object({
+  "ru": zod.string().optional(),
+  "en": zod.string().optional(),
+  "ar": zod.string().optional()
+}).describe('Manual per-language text (RU \/ EN \/ AR).'),
+  "answerI18n": zod.object({
+  "ru": zod.string().optional(),
+  "en": zod.string().optional(),
+  "ar": zod.string().optional()
+}).describe('Manual per-language text (RU \/ EN \/ AR).'),
   "order": zod.number().optional()
 })
 
@@ -114,6 +128,16 @@ export const CreateFaqResponse = zod.object({
   "id": zod.number(),
   "question": zod.string(),
   "answer": zod.string(),
+  "questionI18n": zod.object({
+  "ru": zod.string().optional(),
+  "en": zod.string().optional(),
+  "ar": zod.string().optional()
+}).describe('Manual per-language text (RU \/ EN \/ AR).'),
+  "answerI18n": zod.object({
+  "ru": zod.string().optional(),
+  "en": zod.string().optional(),
+  "ar": zod.string().optional()
+}).describe('Manual per-language text (RU \/ EN \/ AR).'),
   "order": zod.number(),
   "createdAt": zod.string()
 })
@@ -126,13 +150,17 @@ export const UpdateFaqParams = zod.object({
   "id": zod.coerce.number()
 })
 
-
-
-
-
 export const UpdateFaqBody = zod.object({
-  "question": zod.string().min(1).optional(),
-  "answer": zod.string().min(1).optional(),
+  "questionI18n": zod.object({
+  "ru": zod.string().optional(),
+  "en": zod.string().optional(),
+  "ar": zod.string().optional()
+}).optional().describe('Manual per-language text (RU \/ EN \/ AR).'),
+  "answerI18n": zod.object({
+  "ru": zod.string().optional(),
+  "en": zod.string().optional(),
+  "ar": zod.string().optional()
+}).optional().describe('Manual per-language text (RU \/ EN \/ AR).'),
   "order": zod.number().optional()
 })
 
@@ -140,6 +168,16 @@ export const UpdateFaqResponse = zod.object({
   "id": zod.number(),
   "question": zod.string(),
   "answer": zod.string(),
+  "questionI18n": zod.object({
+  "ru": zod.string().optional(),
+  "en": zod.string().optional(),
+  "ar": zod.string().optional()
+}).describe('Manual per-language text (RU \/ EN \/ AR).'),
+  "answerI18n": zod.object({
+  "ru": zod.string().optional(),
+  "en": zod.string().optional(),
+  "ar": zod.string().optional()
+}).describe('Manual per-language text (RU \/ EN \/ AR).'),
   "order": zod.number(),
   "createdAt": zod.string()
 })
@@ -901,6 +939,8 @@ export const ListChatMessagesResponseItem = zod.object({
   "attachmentMimeType": zod.string().nullish(),
   "attachmentSize": zod.number().nullish(),
   "isDeleted": zod.boolean(),
+  "isEdited": zod.boolean().optional(),
+  "editedAt": zod.string().nullish(),
   "isForwarded": zod.boolean(),
   "forwardedFromSenderName": zod.string().nullish(),
   "createdAt": zod.string()
@@ -940,6 +980,7 @@ export const SendChatMessageResponse = zod.object({
   "attachmentSize": zod.number().nullish(),
   "isDeleted": zod.boolean(),
   "isEdited": zod.boolean().optional(),
+  "editedAt": zod.string().nullish(),
   "isForwarded": zod.boolean(),
   "forwardedFromSenderName": zod.string().nullish(),
   "createdAt": zod.string()
@@ -954,6 +995,43 @@ export const MarkConversationReadParams = zod.object({
 })
 
 export const MarkConversationReadResponse = zod.void()
+
+
+/**
+ * @summary Edit a chat message (sender only)
+ */
+export const EditChatMessageParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const EditChatMessageBody = zod.object({
+  "content": zod.string().min(1)
+})
+
+export const EditChatMessageResponse = zod.object({
+  "id": zod.number(),
+  "conversationId": zod.number(),
+  "senderClerkId": zod.string(),
+  "senderName": zod.string(),
+  "senderNickname": zod.string().nullish(),
+  "senderAvatarUrl": zod.string().nullish(),
+  "senderIsAdmin": zod.enum(['true', 'false']),
+  "content": zod.string().nullish(),
+  "attachmentUrl": zod.string().nullish(),
+  "attachmentType": zod.union([zod.literal('image'),zod.literal('video'),zod.literal('file'),zod.literal(null)]).nullish(),
+  "attachmentName": zod.string().nullish(),
+  "attachmentMimeType": zod.string().nullish(),
+  "attachmentSize": zod.number().nullish(),
+  "isDeleted": zod.boolean(),
+  "isEdited": zod.boolean().optional(),
+  "editedAt": zod.string().nullish(),
+  "isForwarded": zod.boolean(),
+  "forwardedFromSenderName": zod.string().nullish(),
+  "createdAt": zod.string()
+})
 
 
 /**
@@ -983,19 +1061,6 @@ export const ForwardChatMessageBody = zod.object({
   "targetConversationId": zod.number()
 })
 
-export const EditChatMessageParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const EditChatMessageBody = zod.object({
-  "content": zod.string()
-})
-
-export const EditChatMessageResponse = zod.object({
-  "id": zod.number(),
-  "content": zod.string().nullish()
-})
-
 export const ForwardChatMessageResponse = zod.object({
   "id": zod.number(),
   "conversationId": zod.number(),
@@ -1011,6 +1076,8 @@ export const ForwardChatMessageResponse = zod.object({
   "attachmentMimeType": zod.string().nullish(),
   "attachmentSize": zod.number().nullish(),
   "isDeleted": zod.boolean(),
+  "isEdited": zod.boolean().optional(),
+  "editedAt": zod.string().nullish(),
   "isForwarded": zod.boolean(),
   "forwardedFromSenderName": zod.string().nullish(),
   "createdAt": zod.string()

@@ -10,6 +10,23 @@ import { requireAdmin } from "../middlewares/adminAuth";
 
 const router: IRouter = Router();
 
+type Translations = { ru?: string; en?: string; ar?: string };
+
+/** Trim each language value and drop empties. */
+function cleanTranslations(input: Translations | undefined): Translations {
+  const out: Translations = {};
+  for (const key of ["ru", "en", "ar"] as const) {
+    const value = input?.[key]?.trim();
+    if (value) out[key] = value;
+  }
+  return out;
+}
+
+/** Legacy single-language fallback: prefer RU, then EN, then AR. */
+function primary(map: Translations): string {
+  return map.ru ?? map.en ?? map.ar ?? "";
+}
+
 // Public: FAQ shown on the home page.
 router.get("/faq", async (_req, res): Promise<void> => {
   const items = await db
@@ -26,11 +43,21 @@ router.post("/faq", requireAdmin, async (req, res): Promise<void> => {
     return;
   }
 
+  const questionI18n = cleanTranslations(parsed.data.questionI18n);
+  const answerI18n = cleanTranslations(parsed.data.answerI18n);
+
+  if (!questionI18n.ru || !answerI18n.ru) {
+    res.status(400).json({ error: "Russian question and answer are required" });
+    return;
+  }
+
   const [created] = await db
     .insert(faqItemsTable)
     .values({
-      question: parsed.data.question,
-      answer: parsed.data.answer,
+      question: primary(questionI18n),
+      answer: primary(answerI18n),
+      questionI18n,
+      answerI18n,
       order: parsed.data.order ?? 0,
     })
     .returning();
@@ -53,8 +80,24 @@ router.patch("/faq/:id", requireAdmin, async (req, res): Promise<void> => {
   }
 
   const set: Record<string, unknown> = {};
-  if (parsed.data.question !== undefined) set.question = parsed.data.question;
-  if (parsed.data.answer !== undefined) set.answer = parsed.data.answer;
+  if (parsed.data.questionI18n !== undefined) {
+    const map = cleanTranslations(parsed.data.questionI18n);
+    if (!map.ru) {
+      res.status(400).json({ error: "Russian question is required" });
+      return;
+    }
+    set.questionI18n = map;
+    set.question = primary(map);
+  }
+  if (parsed.data.answerI18n !== undefined) {
+    const map = cleanTranslations(parsed.data.answerI18n);
+    if (!map.ru) {
+      res.status(400).json({ error: "Russian answer is required" });
+      return;
+    }
+    set.answerI18n = map;
+    set.answer = primary(map);
+  }
   if (parsed.data.order !== undefined) set.order = parsed.data.order;
 
   const [updated] = await db

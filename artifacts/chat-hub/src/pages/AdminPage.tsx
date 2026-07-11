@@ -1001,6 +1001,50 @@ function DashboardManager({ isOwner }: { isOwner: boolean }) {
 }
 
 // ── FAQ Manager ───────────────────────────────────────────────────────────────
+const FAQ_LANGS: { code: 'ru' | 'en' | 'ar'; label: string }[] = [
+  { code: 'ru', label: 'RU' },
+  { code: 'en', label: 'EN' },
+  { code: 'ar', label: 'AR' },
+];
+
+function FaqLangEditor({ question, answer, onQuestion, onAnswer }: {
+  question: Record<string, string>;
+  answer: Record<string, string>;
+  onQuestion: (m: Record<string, string>) => void;
+  onAnswer: (m: Record<string, string>) => void;
+}) {
+  const { t } = useLanguage();
+  const [active, setActive] = useState<'ru' | 'en' | 'ar'>('ru');
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {FAQ_LANGS.map((l) => {
+          const filled = !!question[l.code]?.trim() && !!answer[l.code]?.trim();
+          return (
+            <button
+              key={l.code}
+              type="button"
+              onClick={() => setActive(l.code)}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${active === l.code ? 'bg-primary text-primary-foreground shadow' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}
+            >
+              {l.label}{l.code === 'ru' ? ' *' : ''}{filled ? ' ✓' : ''}
+            </button>
+          );
+        })}
+        <span className="text-[11px] text-muted-foreground ml-1">{t('admin.faqLangHint')}</span>
+      </div>
+      <div dir={active === 'ar' ? 'rtl' : 'ltr'}>
+        <label className="text-xs text-muted-foreground mb-1 block font-medium">{t('admin.faqQuestion')}</label>
+        <Input value={question[active] ?? ''} onChange={(e) => onQuestion({ ...question, [active]: e.target.value })} placeholder={t('admin.faqQuestionPlaceholder')} className="bg-background/50 h-9 text-sm" />
+      </div>
+      <div dir={active === 'ar' ? 'rtl' : 'ltr'}>
+        <label className="text-xs text-muted-foreground mb-1 block font-medium">{t('admin.faqAnswer')}</label>
+        <Textarea value={answer[active] ?? ''} onChange={(e) => onAnswer({ ...answer, [active]: e.target.value })} placeholder={t('admin.faqAnswerPlaceholder')} className="bg-background/50 min-h-[100px] resize-none text-sm rounded-xl" />
+      </div>
+    </div>
+  );
+}
+
 function FaqManager() {
   const { t } = useLanguage();
   const { toast } = useToast();
@@ -1009,10 +1053,13 @@ function FaqManager() {
   const update = useUpdateFaq();
   const remove = useDeleteFaq();
 
+  const emptyDraft = { ru: '', en: '', ar: '' };
   const [addingNew, setAddingNew] = useState(false);
-  const [newItem, setNewItem] = useState({ question: '', answer: '' });
+  const [newQuestion, setNewQuestion] = useState<Record<string, string>>({ ...emptyDraft });
+  const [newAnswer, setNewAnswer] = useState<Record<string, string>>({ ...emptyDraft });
   const [editId, setEditId] = useState<number | null>(null);
-  const [editDraft, setEditDraft] = useState({ question: '', answer: '' });
+  const [editQuestion, setEditQuestion] = useState<Record<string, string>>({ ...emptyDraft });
+  const [editAnswer, setEditAnswer] = useState<Record<string, string>>({ ...emptyDraft });
   const [pendingDelete, setPendingDelete] = useState<FaqItem | null>(null);
   const [reordering, setReordering] = useState(false);
 
@@ -1020,16 +1067,25 @@ function FaqManager() {
 
   const sorted = [...items].sort((a, b) => a.order - b.order || a.id - b.id);
 
+  const trimMap = (m: Record<string, string>) => ({
+    ru: m.ru?.trim() ?? '',
+    en: m.en?.trim() ?? '',
+    ar: m.ar?.trim() ?? '',
+  });
+
   const handleAdd = async () => {
-    if (!newItem.question.trim() || !newItem.answer.trim()) {
+    const q = trimMap(newQuestion);
+    const a = trimMap(newAnswer);
+    if (!q.ru || !a.ru) {
       toast({ title: t('admin.error'), description: t('admin.faqRequired'), variant: 'destructive' });
       return;
     }
     try {
       const nextOrder = sorted.length > 0 ? Math.max(...sorted.map((i) => i.order)) + 1 : 0;
-      await create.mutateAsync({ data: { question: newItem.question.trim(), answer: newItem.answer.trim(), order: nextOrder } });
+      await create.mutateAsync({ data: { questionI18n: q, answerI18n: a, order: nextOrder } });
       toast({ title: '✓', description: t('admin.saved') });
-      setNewItem({ question: '', answer: '' });
+      setNewQuestion({ ...emptyDraft });
+      setNewAnswer({ ...emptyDraft });
       setAddingNew(false);
       await refetch();
     } catch (e: any) {
@@ -1039,16 +1095,19 @@ function FaqManager() {
 
   const startEdit = (item: FaqItem) => {
     setEditId(item.id);
-    setEditDraft({ question: item.question, answer: item.answer });
+    setEditQuestion({ ru: item.questionI18n?.ru ?? item.question ?? '', en: item.questionI18n?.en ?? '', ar: item.questionI18n?.ar ?? '' });
+    setEditAnswer({ ru: item.answerI18n?.ru ?? item.answer ?? '', en: item.answerI18n?.en ?? '', ar: item.answerI18n?.ar ?? '' });
   };
 
   const handleSaveEdit = async (item: FaqItem) => {
-    if (!editDraft.question.trim() || !editDraft.answer.trim()) {
+    const q = trimMap(editQuestion);
+    const a = trimMap(editAnswer);
+    if (!q.ru || !a.ru) {
       toast({ title: t('admin.error'), description: t('admin.faqRequired'), variant: 'destructive' });
       return;
     }
     try {
-      await update.mutateAsync({ id: item.id, data: { question: editDraft.question.trim(), answer: editDraft.answer.trim() } });
+      await update.mutateAsync({ id: item.id, data: { questionI18n: q, answerI18n: a } });
       toast({ title: '✓', description: t('admin.saved') });
       setEditId(null);
       await refetch();
@@ -1116,22 +1175,13 @@ function FaqManager() {
             <Plus className="w-4 h-4" />
             {t('admin.faqAdd')}
           </h4>
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block font-medium">{t('admin.faqQuestion')}</label>
-              <Input value={newItem.question} onChange={(e) => setNewItem({ ...newItem, question: e.target.value })} placeholder={t('admin.faqQuestionPlaceholder')} className="bg-background/50 h-9 text-sm" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block font-medium">{t('admin.faqAnswer')}</label>
-              <Textarea value={newItem.answer} onChange={(e) => setNewItem({ ...newItem, answer: e.target.value })} placeholder={t('admin.faqAnswerPlaceholder')} className="bg-background/50 min-h-[100px] resize-none text-sm rounded-xl" />
-            </div>
-          </div>
+          <FaqLangEditor question={newQuestion} answer={newAnswer} onQuestion={setNewQuestion} onAnswer={setNewAnswer} />
           <div className="flex gap-2">
             <Button onClick={handleAdd} disabled={create.isPending} className="rounded-full gap-1.5 text-sm h-9">
               {create.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
               {t('admin.faqAdd')}
             </Button>
-            <Button variant="ghost" onClick={() => { setAddingNew(false); setNewItem({ question: '', answer: '' }); }} className="rounded-full text-sm h-9">
+            <Button variant="ghost" onClick={() => { setAddingNew(false); setNewQuestion({ ...emptyDraft }); setNewAnswer({ ...emptyDraft }); }} className="rounded-full text-sm h-9">
               {t('admin.cancel')}
             </Button>
           </div>
@@ -1157,14 +1207,7 @@ function FaqManager() {
               >
                 {isEditing ? (
                   <div className="space-y-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block font-medium">{t('admin.faqQuestion')}</label>
-                      <Input value={editDraft.question} onChange={(e) => setEditDraft({ ...editDraft, question: e.target.value })} className="bg-background/50 h-9 text-sm" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block font-medium">{t('admin.faqAnswer')}</label>
-                      <Textarea value={editDraft.answer} onChange={(e) => setEditDraft({ ...editDraft, answer: e.target.value })} className="bg-background/50 min-h-[100px] resize-none text-sm rounded-xl" />
-                    </div>
+                    <FaqLangEditor question={editQuestion} answer={editAnswer} onQuestion={setEditQuestion} onAnswer={setEditAnswer} />
                     <div className="flex gap-2">
                       <Button onClick={() => handleSaveEdit(item)} disabled={update.isPending} className="rounded-full gap-1.5 text-sm h-9">
                         {update.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}

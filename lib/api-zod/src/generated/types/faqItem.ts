@@ -5,11 +5,14 @@
  * Стильный призыв API
  * OpenAPI spec version: 0.1.0
  */
+import type { FaqTranslations } from './faqTranslations';
 
 export interface FaqItem {
   id: number;
   question: string;
   answer: string;
+  questionI18n: FaqTranslations;
+  answerI18n: FaqTranslations;
   order: number;
   createdAt: string;
 }

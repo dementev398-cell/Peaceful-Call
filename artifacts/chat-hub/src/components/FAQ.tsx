@@ -4,10 +4,19 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { useListFaq } from '@workspace/api-client-react';
 
 export function FAQ() {
-  const { t, isRtl } = useLanguage();
+  const { t, isRtl, language } = useLanguage();
   const { data: faqItems } = useListFaq();
 
-  const faqs = (faqItems ?? []).map((item) => ({ q: item.question, a: item.answer }));
+  const lang = language.toLowerCase() as 'ru' | 'en' | 'ar';
+  const pick = (map: { ru?: string; en?: string; ar?: string } | undefined, fallback: string) =>
+    map?.[lang] || map?.ru || map?.en || map?.ar || fallback;
+
+  const faqs = (faqItems ?? [])
+    .map((item) => ({
+      q: pick(item.questionI18n, item.question),
+      a: pick(item.answerI18n, item.answer),
+    }))
+    .filter((f) => f.q && f.a);
 
   // Nothing to show yet — keep the section out of the DOM to avoid an empty card.
   if (faqs.length === 0) return null;

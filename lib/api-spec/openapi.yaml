@@ -915,6 +915,40 @@ paths:
           description: Marked read
 
   /chat/messages/{id}:
+    patch:
+      operationId: editChatMessage
+      tags: [chat]
+      summary: Edit a chat message (sender only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditChatMessageInput"
+      responses:
+        "200":
+          description: Updated message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
     delete:
       operationId: deleteChatMessage
       tags: [chat]
@@ -1308,13 +1342,23 @@ components:
         $ref: "#/components/schemas/ContentItem"
 
     # ── FAQ ────────────────────────────────────────────────────────────
+    FaqTranslations:
+      type: object
+      description: Manual per-language text (RU / EN / AR).
+      properties:
+        ru: { type: string }
+        en: { type: string }
+        ar: { type: string }
+
     FaqItem:
       type: object
-      required: [id, question, answer, order, createdAt]
+      required: [id, question, answer, questionI18n, answerI18n, order, createdAt]
       properties:
         id: { type: integer }
         question: { type: string }
         answer: { type: string }
+        questionI18n: { $ref: "#/components/schemas/FaqTranslations" }
+        answerI18n: { $ref: "#/components/schemas/FaqTranslations" }
         order: { type: integer }
         createdAt: { type: string }
 
@@ -1325,17 +1369,17 @@ components:
 
     FaqInput:
       type: object
-      required: [question, answer]
+      required: [questionI18n, answerI18n]
       properties:
-        question: { type: string, minLength: 1 }
-        answer: { type: string, minLength: 1 }
+        questionI18n: { $ref: "#/components/schemas/FaqTranslations" }
+        answerI18n: { $ref: "#/components/schemas/FaqTranslations" }
         order: { type: integer }
 
     FaqUpdate:
       type: object
       properties:
-        question: { type: string, minLength: 1 }
-        answer: { type: string, minLength: 1 }
+        questionI18n: { $ref: "#/components/schemas/FaqTranslations" }
+        answerI18n: { $ref: "#/components/schemas/FaqTranslations" }
         order: { type: integer }
 
     # ── Admin stats ────────────────────────────────────────────────────
@@ -1755,6 +1799,8 @@ components:
         attachmentMimeType: { type: ["string", "null"] }
         attachmentSize: { type: ["integer", "null"] }
         isDeleted: { type: boolean }
+        isEdited: { type: boolean }
+        editedAt: { type: ["string", "null"] }
         isForwarded: { type: boolean }
         forwardedFromSenderName: { type: ["string", "null"] }
         createdAt: { type: string }
@@ -1784,6 +1830,12 @@ components:
       required: [targetConversationId]
       properties:
         targetConversationId: { type: integer }
+
+    EditChatMessageInput:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string, minLength: 1 }
 
     # ── Storage ────────────────────────────────────────────────────────
     RequestUploadUrlInput:

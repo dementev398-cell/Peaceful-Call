@@ -31,6 +31,9 @@ export interface ChatMessage {
   /** @nullable */
   attachmentSize?: number | null;
   isDeleted: boolean;
+  isEdited?: boolean;
+  /** @nullable */
+  editedAt?: string | null;
   isForwarded: boolean;
   /** @nullable */
   forwardedFromSenderName?: string | null;

@@ -149,10 +149,21 @@ export interface UpsertContentInput {
 
 export type UpsertContentPayload = ContentItem[];
 
+/**
+ * Manual per-language text (RU / EN / AR).
+ */
+export interface FaqTranslations {
+  ru?: string;
+  en?: string;
+  ar?: string;
+}
+
 export interface FaqItem {
   id: number;
   question: string;
   answer: string;
+  questionI18n: FaqTranslations;
+  answerI18n: FaqTranslations;
   order: number;
   createdAt: string;
 }
@@ -160,18 +171,14 @@ export interface FaqItem {
 export type ListFaqPayload = FaqItem[];
 
 export interface FaqInput {
-  /** @minLength 1 */
-  question: string;
-  /** @minLength 1 */
-  answer: string;
+  questionI18n: FaqTranslations;
+  answerI18n: FaqTranslations;
   order?: number;
 }
 
 export interface FaqUpdate {
-  /** @minLength 1 */
-  question?: string;
-  /** @minLength 1 */
-  answer?: string;
+  questionI18n?: FaqTranslations;
+  answerI18n?: FaqTranslations;
   order?: number;
 }
 
@@ -599,6 +606,8 @@ export interface ChatMessage {
   attachmentSize?: number | null;
   isDeleted: boolean;
   isEdited?: boolean;
+  /** @nullable */
+  editedAt?: string | null;
   isForwarded: boolean;
   /** @nullable */
   forwardedFromSenderName?: string | null;
@@ -632,6 +641,7 @@ export interface ForwardChatMessageInput {
 }
 
 export interface EditChatMessageInput {
+  /** @minLength 1 */
   content: string;
 }
 
