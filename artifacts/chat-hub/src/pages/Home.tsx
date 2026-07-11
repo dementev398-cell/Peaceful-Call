@@ -12,12 +12,20 @@ import { Redirect } from 'wouter';
 import { useUser } from '@clerk/react';
 import { Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
   const { isLoaded, isSignedIn } = useUser();
 
-  const hasAnchor = typeof window !== 'undefined' && !!window.location.hash;
+  // Captured once at mount, not recomputed on every render. If we recomputed
+  // this live, navigating away (e.g. to /quran) clears window.location.hash
+  // immediately, and any re-render of this component while it's still
+  // playing its exit animation (AnimatePresence mode="wait") would see an
+  // empty hash and fire the portal redirect below, hijacking the navigation
+  // the user actually asked for.
+  const [hasAnchor] = useState(
+    () => typeof window !== 'undefined' && !!window.location.hash,
+  );
 
   // Support navbar anchor links (/#about, /#faq) coming from other pages:
   // scroll to the section once this page (and its sections) have mounted.
