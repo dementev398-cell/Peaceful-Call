@@ -34,10 +34,13 @@ export function Hero() {
 
   // Parallax effects
   const yBg = useTransform(scrollYProgress, [0, 1], ["0%", "40%"]);
-  const yText = useTransform(scrollYProgress, [0, 1], ["0%", "60%"]);
-  // Fade starts later and finishes right as the section scrolls away, so the CTA
-  // buttons (posts + donate) stay fully clickable for most of the scroll instead
-  // of vanishing the instant the user starts scrolling.
+  // Keep the text/CTA drift subtle so it never gets dragged down far enough to be
+  // clipped by the section's own bottom edge (which used to make it look like the
+  // next block was slamming shut on top of the buttons).
+  const yText = useTransform(scrollYProgress, [0, 1], ["0%", "10%"]);
+  // Fade starts late and finishes right as the section scrolls away, so the CTA
+  // buttons (posts + donate) stay fully visible and clickable for most of the
+  // scroll and simply dissolve in place instead of sliding off and getting cut.
   const opacityText = useTransform(scrollYProgress, [0.8, 1], [1, 0]);
 
   const pills = [
