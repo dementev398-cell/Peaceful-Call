@@ -299,25 +299,25 @@ export default function AdminPage() {
           <div className="relative w-full mb-8">
             <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 flex sm:justify-center scrollbar-none snap-x snap-mandatory">
               <TabsList className="inline-flex bg-card/30 backdrop-blur-xl border border-white/10 p-1.5 rounded-2xl gap-1 sm:gap-2 min-w-max shadow-2xl mx-auto">
-                <TabsTrigger value="dashboard" aria-label={t('admin.dashboard')} className="snap-start rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-primary/20 border border-transparent whitespace-nowrap px-3 py-2 sm:px-4 sm:py-2.5 gap-1.5 sm:gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
+                <TabsTrigger value="dashboard" aria-label={t('admin.dashboard')} className="snap-start rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary whitespace-nowrap px-3 py-2 sm:px-4 sm:py-2.5 gap-1.5 sm:gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
                   <LayoutDashboard className="w-4 h-4 sm:w-4 sm:h-4 shrink-0" />
                   <span className="hidden sm:inline">{t('admin.dashboard')}</span>
                 </TabsTrigger>
                 {isOwner && (
-                  <TabsTrigger value="faq" aria-label={t('admin.faq')} className="snap-start rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-primary/20 border border-transparent whitespace-nowrap px-3 py-2 sm:px-4 sm:py-2.5 gap-1.5 sm:gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
+                  <TabsTrigger value="faq" aria-label={t('admin.faq')} className="snap-start rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary whitespace-nowrap px-3 py-2 sm:px-4 sm:py-2.5 gap-1.5 sm:gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
                     <HelpCircle className="w-4 h-4 sm:w-4 sm:h-4 shrink-0" />
                     <span className="hidden sm:inline">{t('admin.faq')}</span>
                   </TabsTrigger>
                 )}
-                <TabsTrigger value="posts" aria-label={t('admin.posts')} className="snap-start rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-primary/20 border border-transparent whitespace-nowrap px-3 py-2 sm:px-4 sm:py-2.5 gap-1.5 sm:gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
+                <TabsTrigger value="posts" aria-label={t('admin.posts')} className="snap-start rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary whitespace-nowrap px-3 py-2 sm:px-4 sm:py-2.5 gap-1.5 sm:gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
                   <FileText className="w-4 h-4 sm:w-4 sm:h-4 shrink-0" />
                   <span className="hidden sm:inline">{t('admin.posts')}</span>
                 </TabsTrigger>
-                <TabsTrigger value="hadiths" aria-label={t('admin.hadiths')} className="snap-start rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-primary/20 border border-transparent whitespace-nowrap px-3 py-2 sm:px-4 sm:py-2.5 gap-1.5 sm:gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
+                <TabsTrigger value="hadiths" aria-label={t('admin.hadiths')} className="snap-start rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary whitespace-nowrap px-3 py-2 sm:px-4 sm:py-2.5 gap-1.5 sm:gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
                   <ScrollText className="w-4 h-4 sm:w-4 sm:h-4 shrink-0" />
                   <span className="hidden sm:inline">{t('admin.hadiths')}</span>
                 </TabsTrigger>
-                <TabsTrigger value="messages" aria-label={t('admin.messages')} className="snap-start rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-primary/20 border border-transparent whitespace-nowrap px-3 py-2 sm:px-4 sm:py-2.5 gap-1.5 sm:gap-2 relative transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
+                <TabsTrigger value="messages" aria-label={t('admin.messages')} className="snap-start rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary whitespace-nowrap px-3 py-2 sm:px-4 sm:py-2.5 gap-1.5 sm:gap-2 relative transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
                   <MessageCircle className="w-4 h-4 sm:w-4 sm:h-4 shrink-0" />
                   <span className="hidden sm:inline">{t('admin.messages')}</span>
                   {unreadCount > 0 && (
@@ -327,13 +327,13 @@ export default function AdminPage() {
                   )}
                 </TabsTrigger>
                 {isOwner && (
-                  <TabsTrigger value="users" aria-label={t('admin.users')} className="snap-start rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-primary/20 border border-transparent whitespace-nowrap px-3 py-2 sm:px-4 sm:py-2.5 gap-1.5 sm:gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
+                  <TabsTrigger value="users" aria-label={t('admin.users')} className="snap-start rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary whitespace-nowrap px-3 py-2 sm:px-4 sm:py-2.5 gap-1.5 sm:gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
                     <Users className="w-4 h-4 sm:w-4 sm:h-4 shrink-0" />
                     <span className="hidden sm:inline">{t('admin.users')}</span>
                   </TabsTrigger>
                 )}
                 {isOwner && (
-                  <TabsTrigger value="admins" aria-label={t('admin.admins')} className="snap-start rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-primary/20 border border-transparent whitespace-nowrap px-3 py-2 sm:px-4 sm:py-2.5 gap-1.5 sm:gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
+                  <TabsTrigger value="admins" aria-label={t('admin.admins')} className="snap-start rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary/10 data-[state=active]:text-primary whitespace-nowrap px-3 py-2 sm:px-4 sm:py-2.5 gap-1.5 sm:gap-2 transition-all duration-300 font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 data-[state=active]:font-bold data-[state=active]:shadow-[0_0_20px_-5px_hsl(var(--primary)/0.2)]">
                     <Shield className="w-4 h-4 sm:w-4 sm:h-4 shrink-0" />
                     <span className="hidden sm:inline">{t('admin.admins')}</span>
                   </TabsTrigger>
