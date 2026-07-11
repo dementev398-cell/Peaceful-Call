@@ -21,12 +21,12 @@ export function FAQ() {
   if (faqs.length === 0) return null;
 
   return (
-    <section id="faq" className="py-24 md:py-36 bg-background relative overflow-hidden border-y border-border/20" dir="ltr">
+    <section id="faq" className="py-16 md:py-20 bg-background relative overflow-hidden border-y border-border/20" dir="ltr">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.04),transparent_40%)] pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,hsl(var(--primary)/0.03),transparent_40%)] pointer-events-none" />
       
       <div className="container mx-auto px-6 max-w-3xl relative z-10">
-        <div className="text-center mb-14" dir={isRtl ? 'rtl' : 'ltr'}>
+        <div className="text-center mb-10" dir={isRtl ? 'rtl' : 'ltr'}>
           <ScrollReveal>
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-foreground tracking-tight drop-shadow-sm leading-[1.1]" dir="auto">
               {t('faq.title')}
