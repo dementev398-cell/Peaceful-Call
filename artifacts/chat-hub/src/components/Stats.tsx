@@ -12,7 +12,7 @@ export function Stats() {
   ];
 
   return (
-    <section className="py-2 md:py-4 relative bg-background" dir="ltr">
+    <section className="py-0 md:py-2 relative bg-background" dir="ltr">
       <div className="container mx-auto px-4 sm:px-6 max-w-6xl relative z-10">
         <ScrollReveal>
           <div className="relative overflow-hidden rounded-[2rem] border border-primary/20 bg-gradient-to-br from-card/70 via-card/40 to-background/60 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.6)] px-6 py-14 md:px-14 md:py-20">
