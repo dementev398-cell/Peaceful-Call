@@ -1,9 +1,15 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import path from "node:path";
+import { existsSync } from "node:fs";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { sessionMiddleware } from "./middlewares/session";
+
+// The bundled ESM banner sets global __dirname, which is the easiest way to
+// resolve neighboring artifact build outputs in production.
+declare const __dirname: string | undefined;
 
 const app: Express = express();
 
@@ -63,5 +69,21 @@ app.use(express.urlencoded({ extended: true }));
 app.use(sessionMiddleware);
 
 app.use("/api", router);
+
+// In a single-service Render deploy, serve the built frontend from the sibling
+// chat-hub artifact. If the directory isn't present (e.g. development without a
+// prior web build), we simply skip static serving and the API keeps working.
+const webDist = typeof __dirname === "string"
+  ? path.resolve(__dirname, "../../chat-hub/dist/public")
+  : path.resolve(process.cwd(), "../chat-hub/dist/public");
+
+if (existsSync(webDist)) {
+  app.use(express.static(webDist));
+  // SPA fallback for any non-API GET request. Express 5 doesn't accept '*' in
+  // app.get(...), so we use a regex that matches everything.
+  app.get(/.*/, (req, res) => {
+    res.sendFile(path.join(webDist, "index.html"));
+  });
+}
 
 export default app;
