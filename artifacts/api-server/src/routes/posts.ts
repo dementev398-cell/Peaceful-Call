@@ -80,7 +80,8 @@ router.post("/posts", requireAdmin, async (req, res): Promise<void> => {
       attachments: parsed.data.attachments ?? [],
       published: parsed.data.published ?? true,
       authorId: admin.id,
-      authorName: admin.name || admin.email,
+      // Posts are published under the site's brand, not the admin's personal name.
+      authorName: "Peaceful Call",
     })
     .returning();
 

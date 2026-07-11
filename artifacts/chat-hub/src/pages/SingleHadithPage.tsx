@@ -1,7 +1,7 @@
 import { parseApiDate } from "@/lib/date";
 import { PageTransition } from '@/components/PageTransition';
 import { useState } from 'react';
-import { useGetHadith, useGetHadithInteractions, useCreateHadithComment, useDeleteHadithComment, useReactToHadith, getGetHadithInteractionsQueryKey, useGetMyProfile } from '@workspace/api-client-react';
+import { useGetHadith, useGetHadithInteractions, useCreateHadithComment, useDeleteHadithComment, useReactToHadith, getGetHadithInteractionsQueryKey, useGetMyProfile, getGetMyProfileQueryKey } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'wouter';
 import { Navbar } from '@/components/Navbar';
@@ -102,7 +102,7 @@ export default function SingleHadithPage() {
 function HadithInteractions({ hadithId }: { hadithId: number }) {
   const { t, isRtl } = useLanguage();
   const { isSignedIn, user } = useAuth();
-  const { data: myProfile } = useGetMyProfile({ query: { enabled: isSignedIn } });
+  const { data: myProfile } = useGetMyProfile({ query: { queryKey: getGetMyProfileQueryKey(), enabled: isSignedIn } });
   const queryClient = useQueryClient();
   const { data: interactions, isLoading } = useGetHadithInteractions(hadithId);
   const reactMut = useReactToHadith();

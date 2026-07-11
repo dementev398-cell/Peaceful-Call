@@ -66,7 +66,8 @@ router.post("/hadiths", requireAdmin, async (req, res): Promise<void> => {
       topic: parsed.data.topic ?? "",
       published: parsed.data.published ?? true,
       authorId: admin.id,
-      authorName: admin.name || admin.email,
+      // Hadiths are published under the site's brand, not the admin's personal name.
+      authorName: "Peaceful Call",
     })
     .returning();
 

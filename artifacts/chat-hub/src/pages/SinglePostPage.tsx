@@ -1,7 +1,7 @@
 import { parseApiDate } from "@/lib/date";
 import { PageTransition } from '@/components/PageTransition';
 import { useState } from 'react';
-import { useGetPostBySlug, useGetPostInteractions, useCreatePostComment, useDeletePostComment, useReactToPost, getGetPostInteractionsQueryKey, useGetMyProfile } from '@workspace/api-client-react';
+import { useGetPostBySlug, useGetPostInteractions, useCreatePostComment, useDeletePostComment, useReactToPost, getGetPostInteractionsQueryKey, useGetMyProfile, getGetMyProfileQueryKey } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'wouter';
 import { Navbar } from '@/components/Navbar';
@@ -19,11 +19,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CommentAvatarDmDialog } from '@/components/CommentAvatarDmDialog';
+import { useContentDict } from '@/hooks/use-content';
 
 export default function SinglePostPage() {
   const { slug } = useParams();
   const { t, isRtl } = useLanguage();
   const { data: post, isLoading, error } = useGetPostBySlug(slug || '');
+  const { dict } = useContentDict();
+  const logoImg = dict['site.logo'] || '/logo-source.jpg';
 
   if (isLoading) {
     return (
@@ -69,8 +72,8 @@ export default function SinglePostPage() {
 
               {post.authorName && (
                 <div className="flex items-center gap-3 border-t border-border/30 pt-6 mt-6">
-                  <div className="w-11 h-11 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-serif font-bold text-lg">
-                    {post.authorName.charAt(0)}
+                  <div className="w-11 h-11 rounded-full border border-primary/20 overflow-hidden flex-shrink-0 bg-card/50">
+                    <img src={logoImg} alt={post.authorName} className="w-full h-full object-cover" />
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-widest font-semibold">{t('posts.by')}</p>
@@ -120,7 +123,7 @@ export default function SinglePostPage() {
 function PostInteractions({ postId }: { postId: number }) {
   const { t, isRtl } = useLanguage();
   const { isSignedIn, user } = useAuth();
-  const { data: myProfile } = useGetMyProfile({ query: { enabled: isSignedIn } });
+  const { data: myProfile } = useGetMyProfile({ query: { queryKey: getGetMyProfileQueryKey(), enabled: isSignedIn } });
   const queryClient = useQueryClient();
   const { data: interactions, isLoading } = useGetPostInteractions(postId, {
     query: { queryKey: getGetPostInteractionsQueryKey(postId), refetchInterval: 12000 } // poll every 12s for new comments from other users
