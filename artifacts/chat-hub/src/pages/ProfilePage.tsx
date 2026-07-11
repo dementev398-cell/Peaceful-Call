@@ -1,18 +1,21 @@
 import { PageTransition } from '@/components/PageTransition';
 import { Link } from "wouter";
-import { UserProfile, useUser } from "@clerk/react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { ArrowLeft, Camera, Loader2, User, X, Check, Clock, Settings, MessageSquare } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, User, X, Check, Clock, Settings, MessageSquare, Mail, KeyRound } from "lucide-react";
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGetMyProfile, useUpdateMyProfile, useRequestUploadUrl } from '@workspace/api-client-react';
-import { useState, useRef } from 'react';
+import { useState, useRef, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { attachmentSrc } from '@/lib/storage';
+
+const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '') as string;
 
 export default function ProfilePage() {
   const { t, isRtl } = useLanguage();
@@ -51,12 +54,12 @@ export default function ProfilePage() {
           <div className="flex-1 h-px bg-gradient-to-l from-transparent via-border to-transparent" />
         </div>
 
-        {/* ── Section 2: Clerk account management (email, password, security) ── */}
+        {/* ── Section 2: Account management (email, password) ── */}
         <div className="w-full" dir={isRtl ? 'rtl' : 'ltr'}>
           <p className="text-xs text-muted-foreground mb-5">
             {t('profile.accountDesc')}
           </p>
-          <UserProfile routing="hash" />
+          <AccountManagementSection />
         </div>
       </main>
       <Footer />
@@ -66,7 +69,7 @@ export default function ProfilePage() {
 
 function CustomProfileSection() {
   const { t, language, isRtl } = useLanguage();
-  const { user } = useUser();
+  const { user } = useAuth();
   const { data: profile, isLoading, refetch } = useGetMyProfile();
   const updateProfile = useUpdateMyProfile();
   const requestUploadUrl = useRequestUploadUrl();
@@ -218,9 +221,9 @@ function CustomProfileSection() {
 
   const avatarSrc = profile.avatarUrl ? attachmentSrc(profile.avatarUrl) : '';
 
-  // Full name from Clerk — only shown when it actually exists on the user object
-  const hasFullName = !!(user?.firstName || user?.lastName);
-  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ');
+  // Full name — only shown when it actually exists on the account
+  const hasFullName = !!user?.name?.trim();
+  const fullName = user?.name ?? '';
 
   return (
     <div className="glass rounded-[2rem] border border-border/30 p-8 shadow-xl">
@@ -342,7 +345,7 @@ function CustomProfileSection() {
             )}
           </div>
 
-          {/* Full name — only shown when Clerk has a name set for this user */}
+          {/* Full name — only shown when the account has a name set */}
           {hasFullName && (
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
@@ -384,6 +387,192 @@ function CustomProfileSection() {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function AccountManagementSection() {
+  const { t, isRtl } = useLanguage();
+  const { user, refetch } = useAuth();
+  const { toast } = useToast();
+
+  const [email, setEmail] = useState('');
+  const [emailPassword, setEmailPassword] = useState('');
+  const [isChangingEmail, setIsChangingEmail] = useState(false);
+  const [isSubmittingEmail, setIsSubmittingEmail] = useState(false);
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
+
+  const startEmailEdit = () => {
+    setEmail(user?.email ?? '');
+    setEmailPassword('');
+    setIsChangingEmail(true);
+  };
+
+  const handleChangeEmail = async (e: FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingEmail(true);
+    try {
+      const res = await fetch(`${apiBase}/api/auth/change-email`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newEmail: email, currentPassword: emailPassword }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || t('profile.saveError'));
+      }
+      await refetch();
+      toast({ title: '✓', description: t('profile.emailSaved') });
+      setIsChangingEmail(false);
+      setEmailPassword('');
+    } catch (err) {
+      toast({ title: t('nickname.error'), description: err instanceof Error ? err.message : t('profile.saveError'), variant: 'destructive' });
+    } finally {
+      setIsSubmittingEmail(false);
+    }
+  };
+
+  const handleChangePassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingPassword(true);
+    try {
+      const res = await fetch(`${apiBase}/api/auth/change-password`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || t('profile.saveError'));
+      }
+      toast({ title: '✓', description: t('profile.passwordSaved') });
+      setIsChangingPassword(false);
+      setCurrentPassword('');
+      setNewPassword('');
+    } catch (err) {
+      toast({ title: t('nickname.error'), description: err instanceof Error ? err.message : t('profile.saveError'), variant: 'destructive' });
+    } finally {
+      setIsSubmittingPassword(false);
+    }
+  };
+
+  return (
+    <div className="glass rounded-[2rem] border border-border/30 p-8 shadow-xl space-y-8" dir={isRtl ? 'rtl' : 'ltr'}>
+      {/* Email */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Mail className="w-4 h-4 text-primary" />
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            {t('profile.emailLabel')}
+          </label>
+        </div>
+
+        {isChangingEmail ? (
+          <form onSubmit={handleChangeEmail} className="space-y-3 max-w-sm">
+            <div className="space-y-2">
+              <Label className="text-xs">{t('auth.email')}</Label>
+              <Input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="bg-background/50 border-primary/30 focus:border-primary/60 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">{t('profile.currentPassword')}</Label>
+              <Input
+                type="password"
+                required
+                value={emailPassword}
+                onChange={(e) => setEmailPassword(e.target.value)}
+                className="bg-background/50 border-primary/30 focus:border-primary/60 rounded-xl"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button type="submit" disabled={isSubmittingEmail} className="rounded-full gap-2 text-sm h-9">
+                {isSubmittingEmail ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                {t('admin.save')}
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setIsChangingEmail(false)} className="rounded-full text-sm h-9">
+                {t('admin.cancel')}
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex items-center gap-3">
+            <span className="text-base font-sans text-foreground/90">{user?.email}</span>
+            <Button variant="outline" size="sm" onClick={startEmailEdit} className="rounded-full text-xs h-8 px-3">
+              {t('admin.edit')}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-border/20" />
+
+      {/* Password */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <KeyRound className="w-4 h-4 text-primary" />
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            {t('profile.passwordLabel')}
+          </label>
+        </div>
+
+        {isChangingPassword ? (
+          <form onSubmit={handleChangePassword} className="space-y-3 max-w-sm">
+            <div className="space-y-2">
+              <Label className="text-xs">{t('profile.currentPassword')}</Label>
+              <Input
+                type="password"
+                required
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="bg-background/50 border-primary/30 focus:border-primary/60 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">{t('profile.newPassword')}</Label>
+              <Input
+                type="password"
+                required
+                minLength={8}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="bg-background/50 border-primary/30 focus:border-primary/60 rounded-xl"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button type="submit" disabled={isSubmittingPassword} className="rounded-full gap-2 text-sm h-9">
+                {isSubmittingPassword ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                {t('admin.save')}
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setIsChangingPassword(false)} className="rounded-full text-sm h-9">
+                {t('admin.cancel')}
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex items-center gap-3">
+            <span className="text-base font-sans text-muted-foreground">••••••••</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setIsChangingPassword(true); setCurrentPassword(''); setNewPassword(''); }}
+              className="rounded-full text-xs h-8 px-3"
+            >
+              {t('admin.edit')}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
-import { useUser } from '@clerk/react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useStartDirectConversation } from '@workspace/api-client-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
@@ -43,7 +43,7 @@ export function CommentAvatarDmDialog({
   children,
 }: CommentAvatarDmDialogProps) {
   const { t, isRtl } = useLanguage();
-  const { isSignedIn, user } = useUser();
+  const { isSignedIn, user } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const startDm = useStartDirectConversation();

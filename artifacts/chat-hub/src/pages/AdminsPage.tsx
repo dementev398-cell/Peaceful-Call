@@ -3,7 +3,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { useListAdmins, useStartDirectConversation } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
-import { useUser } from "@clerk/react";
+import { useAuth } from "@/contexts/AuthContext";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useContentDict } from "@/hooks/use-content";
@@ -17,7 +17,7 @@ export default function AdminsPage() {
   const { t, isRtl } = useLanguage();
   const { dict } = useContentDict();
   const [, navigate] = useLocation();
-  const { isSignedIn } = useUser();
+  const { isSignedIn } = useAuth();
   const startDirect = useStartDirectConversation();
 
   const logoImg = dict['site.logo'] || '/logo-source.jpg';

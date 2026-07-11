@@ -13,10 +13,12 @@ import storageRouter from "./storage";
 import hadithsRouter from "./hadiths";
 import hadithInteractionsRouter from "./hadith-interactions";
 import userProfileRouter from "./user-profile";
+import authRouter from "./auth";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(authRouter);
 router.use(meRouter);
 router.use(contentRouter);
 router.use(faqRouter);

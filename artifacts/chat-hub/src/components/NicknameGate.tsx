@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useGetMyProfile, useUpdateMyProfile, useGetMe } from '@workspace/api-client-react';
-import { useUser } from '@clerk/react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import { Loader2, User, Sparkles } from 'lucide-react';
@@ -15,7 +15,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
  * Admins are never blocked.
  */
 export function NicknameGate({ children }: { children: React.ReactNode }) {
-  const { isSignedIn, isLoaded: clerkLoaded } = useUser();
+  const { isSignedIn, isLoaded: authLoaded } = useAuth();
   const { data: admin, isLoading: adminLoading } = useGetMe();
   const { data: profile, isLoading: profileLoading, refetch } = useGetMyProfile({
     query: { enabled: !!isSignedIn, queryKey: ['/api/profile/me'] }
@@ -31,7 +31,7 @@ export function NicknameGate({ children }: { children: React.ReactNode }) {
   const isOnProfilePage = location === '/profile';
 
   // While loading, show children to avoid flash
-  if (!clerkLoaded || !isSignedIn || adminLoading || profileLoading || isOnProfilePage) {
+  if (!authLoaded || !isSignedIn || adminLoading || profileLoading || isOnProfilePage) {
     return <>{children}</>;
   }
 

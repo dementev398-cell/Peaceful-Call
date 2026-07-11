@@ -19,11 +19,12 @@ import {
 } from "@workspace/api-client-react";
 import type { ChatMessage } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useUser } from "@clerk/react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { attachmentSrc } from "@/lib/storage";
 import { Loader2, Search, Send, FilePlus, Paperclip, X, Download, FileText, UserCircle, MessageCircle, Shield, Eye, ArrowLeft, MoreHorizontal, Trash2, Pencil, Check } from "lucide-react";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useRequestUploadUrl } from "@workspace/api-client-react";
@@ -67,7 +68,7 @@ async function fetchAdminConversationMessages(conversationId: number) {
 
 export default function MessagesPage() {
   const { t } = useLanguage();
-  const { user } = useUser();
+  const { user } = useAuth();
   const search = useSearch();
   const queryClient = useQueryClient();
   const [activeConvId, setActiveConvId] = useState<number | null>(null);
@@ -191,7 +192,7 @@ export default function MessagesPage() {
                       className={`w-full flex items-start gap-3 p-3 rounded-2xl transition-all text-left ${adminViewConvId === conv.id ? 'bg-amber-500/20 border border-amber-500/30' : 'hover:bg-muted border border-transparent'}`}
                     >
                       <Avatar className="w-12 h-12 border border-border mt-0.5">
-                        <AvatarImage src={conv.otherAvatarUrl || ''} />
+                        <AvatarImage src={conv.otherAvatarUrl ? attachmentSrc(conv.otherAvatarUrl) : ''} />
                         <AvatarFallback className="bg-secondary">{conv.title.charAt(0)}</AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
@@ -262,7 +263,7 @@ export default function MessagesPage() {
                     >
                       <div className="relative mt-0.5">
                         <Avatar className="w-12 h-12 border border-border">
-                          <AvatarImage src={conv.otherAvatarUrl || ''} />
+                          <AvatarImage src={conv.otherAvatarUrl ? attachmentSrc(conv.otherAvatarUrl) : ''} />
                           <AvatarFallback className={conv.kind === 'support' ? 'bg-primary/20 text-primary' : 'bg-secondary'}>
                             {conv.kind === 'support' ? 'АД' : conv.title.charAt(0)}
                           </AvatarFallback>
@@ -447,7 +448,7 @@ function MessageBubble({
           <div className="w-7 sm:w-8 shrink-0">
             {showAvatar && (
               <Avatar className="w-7 h-7 sm:w-8 sm:h-8">
-                <AvatarImage src={msg.senderAvatarUrl || ''} />
+                <AvatarImage src={msg.senderAvatarUrl ? attachmentSrc(msg.senderAvatarUrl) : ''} />
                 <AvatarFallback className="text-[10px]">{msg.senderName.charAt(0)}</AvatarFallback>
               </Avatar>
             )}
@@ -599,7 +600,7 @@ function MessageBubble({
 function ChatThread({ conversationId, onBack }: { conversationId: number, onBack: () => void }) {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const { user } = useUser();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [content, setContent] = useState('');
   const [pendingUpload, setPendingUpload] = useState<File | null>(null);
@@ -872,7 +873,7 @@ function AdminReadonlyChatThread({
                     <div className="w-8 shrink-0">
                       {showAvatar && (
                         <Avatar className="w-8 h-8">
-                          <AvatarImage src={msg.senderAvatarUrl || ''} />
+                          <AvatarImage src={msg.senderAvatarUrl ? attachmentSrc(msg.senderAvatarUrl) : ''} />
                           <AvatarFallback className="text-[10px]">{msg.senderName?.charAt(0) ?? '?'}</AvatarFallback>
                         </Avatar>
                       )}
@@ -1136,7 +1137,7 @@ function NewConversationDialog({ onSelect }: { onSelect: (id: number) => void })
                   >
                     <div className="flex items-center gap-3">
                       <Avatar className="w-10 h-10 border border-border">
-                        <AvatarImage src={u.avatarUrl || ''} />
+                        <AvatarImage src={u.avatarUrl ? attachmentSrc(u.avatarUrl) : ''} />
                         <AvatarFallback><UserCircle className="w-6 h-6 text-muted-foreground" /></AvatarFallback>
                       </Avatar>
                       <div>
@@ -1206,7 +1207,7 @@ function SuperAdminUserPickerDialog({ onSelectUser }: { onSelectUser: (clerkUser
                 >
                   <div className="flex items-center gap-3">
                     <Avatar className="w-10 h-10 border border-border">
-                      <AvatarImage src={u.avatarUrl || ''} />
+                      <AvatarImage src={u.avatarUrl ? attachmentSrc(u.avatarUrl) : ''} />
                       <AvatarFallback><UserCircle className="w-6 h-6 text-muted-foreground" /></AvatarFallback>
                     </Avatar>
                     <div>

@@ -52,6 +52,9 @@ import {
   Dialog,
   DialogContent,
   DialogClose,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import {
   Loader2, LogOut, Plus, Trash2, Edit2, Check, X,
@@ -60,9 +63,9 @@ import {
   ChevronLeft, FileText, LayoutDashboard,
   ScrollText, Paperclip, Film, Camera, ShieldCheck, ShieldOff,
   Home, Eye, Maximize2, Minimize2, HelpCircle, ArrowUp, ArrowDown,
-  MessagesSquare, Inbox
+  MessagesSquare, Inbox, Settings
 } from 'lucide-react';
-import { useClerk, useUser } from '@clerk/react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useContentDict } from '@/hooks/use-content';
@@ -122,7 +125,7 @@ function ConfirmDialog({
   );
 }
 
-async function clerkFetch(path: string, options: RequestInit = {}) {
+async function adminFetch(path: string, options: RequestInit = {}) {
   const res = await fetch(path, {
     ...options,
     credentials: 'include',
@@ -151,15 +154,14 @@ function AdminGateShell({ children }: { children: React.ReactNode }) {
 
 export default function AdminPage() {
   const { data: user, isLoading } = useGetMe();
-  const { isSignedIn, isLoaded: clerkLoaded } = useUser();
+  const { isSignedIn, isLoaded: authLoaded, signOut } = useAuth();
   const [, setLocation] = useLocation();
-  const { signOut } = useClerk();
   const { data: unreadData } = useGetUnreadCount();
   const { t, language } = useLanguage();
   const isMobile = useIsMobile();
   const unreadCount = unreadData?.count ?? 0;
 
-  if (isLoading || !clerkLoaded) {
+  if (isLoading || !authLoaded) {
     return (
       <PageTransition className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-7 h-7 animate-spin text-primary" />
@@ -190,7 +192,7 @@ export default function AdminPage() {
         </div>
         <h2 className="text-2xl font-serif font-bold mb-3">{t('admin.accessDenied')}</h2>
         <p className="text-muted-foreground text-sm mb-7">{t('admin.accessDeniedDesc')}</p>
-        <Button variant="outline" onClick={() => signOut({ redirectUrl: '/' })} className="w-full h-11 rounded-full">
+        <Button variant="outline" onClick={() => { signOut(); setLocation('/'); }} className="w-full h-11 rounded-full">
           {t('admin.signOut')}
         </Button>
       </AdminGateShell>
@@ -207,7 +209,8 @@ export default function AdminPage() {
     : (language === 'RU' ? 'Редактор' : language === 'AR' ? 'محرر' : 'Editor');
 
   const handleLogout = () => {
-    signOut({ redirectUrl: '/' });
+    signOut();
+    setLocation('/');
   };
 
   return (
@@ -498,11 +501,38 @@ function UsersManager() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
+  const [resetTarget, setResetTarget] = useState<{ id: string; name: string } | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+
+  const resetCopy = {
+    RU: { title: 'Сбросить пароль', label: 'Новый пароль', placeholder: 'Минимум 8 символов', submit: 'Сбросить', cancel: 'Отмена', success: 'Пароль обновлён', action: 'Сбросить пароль' },
+    EN: { title: 'Reset password', label: 'New password', placeholder: 'At least 8 characters', submit: 'Reset', cancel: 'Cancel', success: 'Password updated', action: 'Reset password' },
+    AR: { title: 'إعادة تعيين كلمة المرور', label: 'كلمة مرور جديدة', placeholder: '8 أحرف على الأقل', submit: 'إعادة التعيين', cancel: 'إلغاء', success: 'تم تحديث كلمة المرور', action: 'إعادة تعيين كلمة المرور' },
+  }[language as 'RU' | 'EN' | 'AR'];
+
+  const handleResetPassword = async () => {
+    if (!resetTarget || resetPassword.length < 8) return;
+    setResetSubmitting(true);
+    try {
+      await adminFetch(`/api/admins/users/${resetTarget.id}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify({ newPassword: resetPassword }),
+      });
+      toast({ title: '✓', description: resetCopy.success });
+      setResetTarget(null);
+      setResetPassword('');
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally {
+      setResetSubmitting(false);
+    }
+  };
 
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const data = await clerkFetch('/api/admins/clerk-users');
+      const data = await adminFetch('/api/admins/users');
       setUsers(data);
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
@@ -516,7 +546,7 @@ function UsersManager() {
   const executeBan = async (userId: string, isBanned: boolean) => {
     setActionLoading(userId + '_ban');
     try {
-      await clerkFetch(`/api/admins/clerk-users/${userId}/${isBanned ? 'unban' : 'ban'}`, { method: 'POST' });
+      await adminFetch(`/api/admins/users/${userId}/${isBanned ? 'unban' : 'ban'}`, { method: 'POST' });
       toast({ title: isBanned ? t('admin.unbanUser') : t('admin.banUser') });
       await loadUsers();
     } catch (e: any) {
@@ -529,7 +559,7 @@ function UsersManager() {
   const executeDelete = async (userId: string) => {
     setActionLoading(userId + '_del');
     try {
-      await clerkFetch(`/api/admins/clerk-users/${userId}`, { method: 'DELETE' });
+      await adminFetch(`/api/admins/users/${userId}`, { method: 'DELETE' });
       toast({ title: t('admin.deleteUser') });
       await loadUsers();
     } catch (e: any) {
@@ -622,20 +652,16 @@ function UsersManager() {
               >
                 {/* Avatar */}
                 <div className="w-9 h-9 rounded-full overflow-hidden bg-muted border border-border flex-shrink-0 shadow-sm">
-                  {u.imageUrl ? (
-                    <img src={u.imageUrl} alt={u.firstName} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-sm font-bold text-muted-foreground bg-primary/10">
-                      {(u.firstName || u.email || '?').charAt(0).toUpperCase()}
-                    </div>
-                  )}
+                  <div className="w-full h-full flex items-center justify-center text-sm font-bold text-muted-foreground bg-primary/10">
+                    {(u.name || u.email || '?').charAt(0).toUpperCase()}
+                  </div>
                 </div>
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-semibold text-foreground truncate">
-                      {[u.firstName, u.lastName].filter(Boolean).join(' ') || 'Anonymous'}
+                      {u.name || 'Anonymous'}
                     </span>
                     {u.banned && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/10 text-destructive text-[10px] font-bold uppercase tracking-wider border border-destructive/20">
@@ -652,7 +678,17 @@ function UsersManager() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setPending({ type: 'ban', userId: u.id, isBanned: u.banned, name: u.firstName })}
+                    onClick={() => { setResetTarget({ id: u.id, name: u.name || u.email }); setResetPassword(''); }}
+                    disabled={!!actionLoading}
+                    className="h-8 px-2.5 rounded-lg text-xs font-medium gap-1.5 text-primary hover:bg-primary/10 transition-all"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{resetCopy.action}</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPending({ type: 'ban', userId: u.id, isBanned: u.banned, name: u.name || u.email })}
                     disabled={!!actionLoading}
                     className={`h-8 px-2.5 rounded-lg text-xs font-medium gap-1.5 transition-all ${
                       u.banned
@@ -670,7 +706,7 @@ function UsersManager() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setPending({ type: 'delete', userId: u.id, name: u.firstName || u.email })}
+                    onClick={() => setPending({ type: 'delete', userId: u.id, name: u.name || u.email })}
                     disabled={!!actionLoading}
                     className="h-8 w-8 rounded-lg text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-all"
                   >
@@ -686,6 +722,42 @@ function UsersManager() {
           </div>
         </div>
       )}
+
+      <Dialog open={!!resetTarget} onOpenChange={(open) => { if (!open) setResetTarget(null); }}>
+        <DialogContent className="rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>{resetCopy.title}{resetTarget ? ` — ${resetTarget.name}` : ''}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {resetCopy.label}
+              </label>
+              <Input
+                type="text"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                placeholder={resetCopy.placeholder}
+                minLength={8}
+                className="rounded-xl"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={() => setResetTarget(null)} className="rounded-full">
+                {resetCopy.cancel}
+              </Button>
+              <Button
+                onClick={handleResetPassword}
+                disabled={resetPassword.length < 8 || resetSubmitting}
+                className="rounded-full gap-2"
+              >
+                {resetSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {resetCopy.submit}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1759,17 +1831,17 @@ function HadithsManager() {
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t('admin.hadithGrade')}</label>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {HADITH_GRADES.map((grade) => (
                 <button
                   key={grade}
                   type="button"
                   onClick={() => setEditingHadith({ ...editingHadith, grade })}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide border transition-all ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide border transition-all text-center truncate ${
                     editingHadith.grade === grade
-                      ? 'bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/20'
+                      ? GRADE_COLORS[grade] ?? 'bg-primary/10 text-primary border-primary/30'
                       : 'bg-muted/40 text-muted-foreground border-border/40 hover:text-foreground hover:border-border'
-                  }`}
+                  } ${editingHadith.grade === grade ? 'ring-1 ring-inset ring-current/40 shadow-sm' : ''}`}
                 >
                   {gradeLabel(grade)}
                 </button>
@@ -1887,7 +1959,7 @@ function AdminsManager() {
       } else if (p.type === 'revoke') {
         await updateRole.mutateAsync({ id: p.id, data: { role: 'editor' } });
       } else if (p.type === 'transfer') {
-        await clerkFetch(`/api/admins/${p.id}/role`, {
+        await adminFetch(`/api/admins/${p.id}/role`, {
           method: 'PATCH',
           body: JSON.stringify({ role: 'owner', transferOwnership: true }),
         });

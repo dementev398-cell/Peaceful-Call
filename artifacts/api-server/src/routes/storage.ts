@@ -4,7 +4,7 @@ import {
   RequestUploadUrlResponse,
 } from '@workspace/api-zod';
 import { Router, type IRouter, type Request, type Response } from 'express';
-import { getAuth } from '@clerk/express';
+import { getAuth } from "../middlewares/session";
 
 import { ObjectStorageService } from '../lib/objectStorage';
 import { ObjectNotFoundError } from '../lib/objectStorage';

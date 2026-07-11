@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, sql } from "drizzle-orm";
-import { getAuth, clerkClient } from "@clerk/express";
-import { db, userProfilesTable, appUsersTable } from "@workspace/db";
+import { getAuth } from "../middlewares/session";
+import { db, userProfilesTable, appUsersTable, usersTable } from "@workspace/db";
 import { requireAppUser } from "../middlewares/appUser";
 
 const router: IRouter = Router();
@@ -23,17 +23,16 @@ async function isNicknameTaken(nickname: string, excludeClerkUserId?: string): P
   return !(existing && rows.length === 1 && rows[0].id === existing.id);
 }
 
-// Generates a unique fallback nickname from Clerk user data, appending a
+// Generates a unique fallback nickname from local user data, appending a
 // numeric suffix if the base nickname is already taken by someone else.
 async function generateUniqueFallbackNickname(userId: string): Promise<string> {
   let base = "User";
   try {
-    const user = await clerkClient.users.getUser(userId);
-    base =
-      user.firstName?.trim() ||
-      user.username?.trim() ||
-      user.emailAddresses[0]?.emailAddress?.split("@")[0] ||
-      "User";
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, Number(userId)));
+    base = user?.name?.trim() || user?.email?.split("@")[0] || "User";
   } catch {
     // best-effort
   }

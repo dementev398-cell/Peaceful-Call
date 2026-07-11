@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, count, sql } from "drizzle-orm";
-import { getAuth } from "@clerk/express";
-import { db, postCommentsTable, postReactionsTable, postsTable, adminsTable } from "@workspace/db";
+import { getAuth } from "../middlewares/session";
+import { db, postCommentsTable, postReactionsTable, postsTable, adminsTable, userProfilesTable } from "@workspace/db";
 import { resolveAdmin } from "../middlewares/adminAuth";
 import { requireAppUser } from "../middlewares/appUser";
 
@@ -58,11 +58,19 @@ router.post("/posts/:id/comments", requireAppUser, async (req, res): Promise<voi
   const appUser = req.appUser!;
   const admin = await resolveAdmin(req);
 
+  // The user's avatar is set via PATCH /profile/me on the user_profiles
+  // table, not on the app_users mirror row — read it from there so new
+  // comments reflect the current profile picture.
+  const [profile] = await db
+    .select({ avatarUrl: userProfilesTable.avatarUrl })
+    .from(userProfilesTable)
+    .where(eq(userProfilesTable.clerkUserId, appUser.clerkUserId));
+
   const [comment] = await db.insert(postCommentsTable).values({
     postId,
     authorClerkId: appUser.clerkUserId,
     authorName: appUser.name || appUser.email || "Аноним",
-    authorAvatarUrl: appUser.avatarUrl,
+    authorAvatarUrl: profile?.avatarUrl || appUser.avatarUrl,
     isAdmin: !!admin,
     content: content.trim(),
   }).returning();

@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, or, desc, and, isNull } from "drizzle-orm";
 import { db, messagesTable } from "@workspace/db";
-import { getAuth } from "@clerk/express";
+import { getAuth } from "../middlewares/session";
 import { requireAdmin, resolveAdmin } from "../middlewares/adminAuth";
 import {
   ListMessagesResponse,

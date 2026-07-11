@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
-import { getAuth, clerkClient } from "@clerk/express";
+import { getAuth } from "./session";
 import { eq } from "drizzle-orm";
-import { db, appUsersTable, type AppUser } from "@workspace/db";
+import { db, appUsersTable, usersTable, type AppUser } from "@workspace/db";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -13,10 +13,11 @@ declare global {
 }
 
 /**
- * JIT-syncs the signed-in Clerk user into the local app_users mirror table so
- * we can list/search people to chat with and show names/avatars without
- * calling out to Clerk on every read. Cheap best-effort upsert; failures here
- * must never block the request.
+ * JIT-syncs the signed-in local user into the app_users mirror table so we
+ * can list/search people to chat with and show names/avatars without
+ * re-reading the users table on every read. Cheap best-effort upsert;
+ * failures here must never block the request. Never overwrites avatarUrl —
+ * that's only ever set via PATCH /profile/me.
  */
 export async function requireAppUser(
   req: Request,
@@ -33,20 +34,17 @@ export async function requireAppUser(
   try {
     let name = "";
     let email = "";
-    let avatarUrl: string | null = null;
     try {
-      const user = await clerkClient.users.getUser(userId);
-      email =
-        user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)
-          ?.emailAddress ??
-        user.emailAddresses[0]?.emailAddress ??
-        "";
-      name = [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || email;
-      avatarUrl = user.imageUrl ?? null;
+      const [user] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.id, Number(userId)));
+      email = user?.email ?? "";
+      name = user?.name?.trim() || email;
     } catch (fetchErr) {
       req.log?.error(
         { err: fetchErr, userId },
-        "requireAppUser: failed to fetch Clerk user details",
+        "requireAppUser: failed to fetch local user details",
       );
     }
 
@@ -63,10 +61,10 @@ export async function requireAppUser(
 
     const [synced] = await db
       .insert(appUsersTable)
-      .values({ clerkUserId: userId, name, email, avatarUrl })
+      .values({ clerkUserId: userId, name, email, avatarUrl: null })
       .onConflictDoUpdate({
         target: appUsersTable.clerkUserId,
-        set: { name, email, avatarUrl, updatedAt: new Date().toISOString() },
+        set: { name, email, updatedAt: new Date().toISOString() },
       })
       .returning();
 

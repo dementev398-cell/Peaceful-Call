@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
-import { getAuth, clerkClient } from "@clerk/express";
+import { getAuth } from "./session";
 import { eq, count, sql } from "drizzle-orm";
-import { db, adminsTable, type Admin } from "@workspace/db";
+import { db, adminsTable, usersTable, type Admin } from "@workspace/db";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -13,7 +13,7 @@ declare global {
 }
 
 /**
- * Resolves the signed-in Clerk user (if any) to an Admin row, bootstrapping
+ * Resolves the signed-in local user (if any) to an Admin row, bootstrapping
  * the very first signed-in user in the system as the "owner" admin so the
  * site always has someone who can configure content/appearance/other admins
  * without a manual DB seed step.
@@ -53,23 +53,19 @@ export async function resolveAdmin(req: Request): Promise<Admin | null> {
 
       if (adminCount > 0) return null;
 
-      // Fetching user details from Clerk is best-effort — if it fails (e.g.
-      // transient network issue) we still must not block the very first
-      // admin from being created, so fall back to session-claim data.
       let email = "";
       let name = "";
       try {
-        const user = await clerkClient.users.getUser(userId);
-        email =
-          user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)
-            ?.emailAddress ??
-          user.emailAddresses[0]?.emailAddress ??
-          "";
-        name = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+        const [user] = await tx
+          .select()
+          .from(usersTable)
+          .where(eq(usersTable.id, Number(userId)));
+        email = user?.email ?? "";
+        name = user?.name ?? "";
       } catch (fetchErr) {
         req.log?.error(
           { err: fetchErr, userId },
-          "resolveAdmin: failed to fetch Clerk user details during owner bootstrap; proceeding with empty email/name",
+          "resolveAdmin: failed to fetch local user details during owner bootstrap; proceeding with empty email/name",
         );
       }
 

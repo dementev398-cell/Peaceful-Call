@@ -2,7 +2,7 @@ import { PageTransition } from '@/components/PageTransition';
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Link } from "wouter";
-import { useUser } from "@clerk/react";
+import { useAuth } from "@/contexts/AuthContext";
 import { useGetMe } from "@workspace/api-client-react";
 import { Shield, MessageCircle, Settings, Users, ArrowRight, BookOpen, ScrollText } from "lucide-react";
 import { ScrollReveal } from "@/components/ScrollReveal";
@@ -10,11 +10,11 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { motion } from "framer-motion";
 
 export default function PortalPage() {
-  const { user } = useUser();
+  const { user } = useAuth();
   const { data: admin } = useGetMe();
   const { t, isRtl } = useLanguage();
 
-  const firstName = user?.firstName || '';
+  const firstName = user?.name?.trim().split(' ')[0] || '';
   const greeting = firstName ? `${t('portal.greeting')}, ${firstName}` : t('portal.greeting');
 
   const cards = [

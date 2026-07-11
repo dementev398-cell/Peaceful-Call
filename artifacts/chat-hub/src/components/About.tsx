@@ -42,7 +42,7 @@ export function About() {
 
           <ScrollReveal delay="100">
             <div dir={isRtl ? 'rtl' : 'ltr'}>
-              <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-foreground mb-8 tracking-tight drop-shadow-sm">
+              <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-foreground mb-8 tracking-tight drop-shadow-sm whitespace-nowrap">
                 {t('about.title')}
               </h2>
               <div className={`w-20 h-1 bg-gradient-to-r from-primary to-transparent mb-10 rounded-full ${isRtl ? 'ml-auto' : ''}`}></div>

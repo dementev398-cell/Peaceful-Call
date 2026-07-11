@@ -1,16 +1,18 @@
 import { parseApiDate } from "@/lib/date";
 import { PageTransition } from '@/components/PageTransition';
 import { useState } from 'react';
-import { useGetHadith, useGetHadithInteractions, useCreateHadithComment, useDeleteHadithComment, useReactToHadith } from '@workspace/api-client-react';
+import { useGetHadith, useGetHadithInteractions, useCreateHadithComment, useDeleteHadithComment, useReactToHadith, getGetHadithInteractionsQueryKey, useGetMyProfile } from '@workspace/api-client-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'wouter';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import { Loader2, ArrowLeft, BookMarked, ThumbsUp, ThumbsDown, MessageCircle, Trash2, ShieldCheck, Send, User } from 'lucide-react';
 import { ScrollReveal } from '@/components/ScrollReveal';
 import NotFound from './not-found';
-import { useUser } from '@clerk/react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { GRADE_META } from '@/lib/hadithGrades';
+import { attachmentSrc } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -99,7 +101,9 @@ export default function SingleHadithPage() {
 
 function HadithInteractions({ hadithId }: { hadithId: number }) {
   const { t, isRtl } = useLanguage();
-  const { isSignedIn, user } = useUser();
+  const { isSignedIn, user } = useAuth();
+  const { data: myProfile } = useGetMyProfile({ query: { enabled: isSignedIn } });
+  const queryClient = useQueryClient();
   const { data: interactions, isLoading } = useGetHadithInteractions(hadithId);
   const reactMut = useReactToHadith();
   const addComment = useCreateHadithComment();
@@ -107,12 +111,18 @@ function HadithInteractions({ hadithId }: { hadithId: number }) {
   const { toast } = useToast();
   const [commentText, setCommentText] = useState('');
 
+  const invalidateInteractions = () => {
+    queryClient.invalidateQueries({ queryKey: getGetHadithInteractionsQueryKey(hadithId) });
+  };
+
   const handleReact = (type: 'like' | 'dislike') => {
     if (!isSignedIn) {
       toast({ title: t('post.signInToComment'), variant: 'destructive' });
       return;
     }
-    reactMut.mutate({ id: hadithId, data: { type } });
+    reactMut.mutate({ id: hadithId, data: { type } }, {
+      onSuccess: () => invalidateInteractions(),
+    });
   };
 
   const handleComment = async () => {
@@ -121,6 +131,7 @@ function HadithInteractions({ hadithId }: { hadithId: number }) {
       await addComment.mutateAsync({ id: hadithId, data: { content: commentText } });
       setCommentText('');
       toast({ title: '✓', description: isRtl ? 'تم إرسال التعليق' : 'Комментарий отправлен' });
+      invalidateInteractions();
     } catch {
       toast({ title: t('nickname.error'), variant: 'destructive' });
     }
@@ -130,6 +141,7 @@ function HadithInteractions({ hadithId }: { hadithId: number }) {
     if (!confirm(isRtl ? 'هل تريد حذف التعليق؟' : 'Удалить комментарий?')) return;
     try {
       await deleteComment.mutateAsync({ id: hadithId, commentId });
+      invalidateInteractions();
     } catch {
       toast({ title: t('nickname.error'), variant: 'destructive' });
     }
@@ -201,9 +213,9 @@ function HadithInteractions({ hadithId }: { hadithId: number }) {
           <div className="mb-8 glass rounded-2xl border border-border/30 p-5">
             <div className="flex gap-3">
               <Avatar className="w-10 h-10 border border-primary/20 flex-shrink-0">
-                <AvatarImage src={user.imageUrl} />
+                {myProfile?.avatarUrl && <AvatarImage src={attachmentSrc(myProfile.avatarUrl)} />}
                 <AvatarFallback className="bg-primary/10 text-primary text-sm font-bold">
-                  {(user.firstName || user.emailAddresses[0]?.emailAddress || 'U').charAt(0).toUpperCase()}
+                  {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 space-y-3">
@@ -262,7 +274,7 @@ function HadithInteractions({ hadithId }: { hadithId: number }) {
                       isAdmin={comment.isAdmin}
                     >
                       <Avatar className="w-10 h-10 border border-border/50 flex-shrink-0">
-                        <AvatarImage src={comment.authorAvatarUrl || ''} />
+                        <AvatarImage src={comment.authorAvatarUrl ? attachmentSrc(comment.authorAvatarUrl) : ''} />
                         <AvatarFallback className={`text-sm font-bold ${comment.isAdmin ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
                           {comment.authorName.charAt(0).toUpperCase()}
                         </AvatarFallback>

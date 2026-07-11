@@ -1,7 +1,7 @@
 import { parseApiDate } from "@/lib/date";
 import { PageTransition } from '@/components/PageTransition';
 import { useState } from 'react';
-import { useGetPostBySlug, useGetPostInteractions, useCreatePostComment, useDeletePostComment, useReactToPost, getGetPostInteractionsQueryKey } from '@workspace/api-client-react';
+import { useGetPostBySlug, useGetPostInteractions, useCreatePostComment, useDeletePostComment, useReactToPost, getGetPostInteractionsQueryKey, useGetMyProfile } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'wouter';
 import { Navbar } from '@/components/Navbar';
@@ -11,7 +11,7 @@ import { ScrollReveal } from '@/components/ScrollReveal';
 import { PostAttachments } from '@/components/PostAttachments';
 import { attachmentSrc } from '@/lib/storage';
 import NotFound from './not-found';
-import { useUser } from '@clerk/react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -119,7 +119,8 @@ export default function SinglePostPage() {
 
 function PostInteractions({ postId }: { postId: number }) {
   const { t, isRtl } = useLanguage();
-  const { isSignedIn, user } = useUser();
+  const { isSignedIn, user } = useAuth();
+  const { data: myProfile } = useGetMyProfile({ query: { enabled: isSignedIn } });
   const queryClient = useQueryClient();
   const { data: interactions, isLoading } = useGetPostInteractions(postId, {
     query: { queryKey: getGetPostInteractionsQueryKey(postId), refetchInterval: 12000 } // poll every 12s for new comments from other users
@@ -232,9 +233,9 @@ function PostInteractions({ postId }: { postId: number }) {
           <div className="mb-8 glass rounded-2xl border border-border/30 p-5">
             <div className="flex gap-3">
               <Avatar className="w-10 h-10 border border-primary/20 flex-shrink-0">
-                <AvatarImage src={user.imageUrl} />
+                {myProfile?.avatarUrl && <AvatarImage src={attachmentSrc(myProfile.avatarUrl)} />}
                 <AvatarFallback className="bg-primary/10 text-primary text-sm font-bold">
-                  {(user.firstName || user.emailAddresses[0]?.emailAddress || 'U').charAt(0).toUpperCase()}
+                  {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 space-y-3">
@@ -293,7 +294,7 @@ function PostInteractions({ postId }: { postId: number }) {
                       isAdmin={comment.isAdmin}
                     >
                       <Avatar className="w-10 h-10 border border-border/50 flex-shrink-0">
-                        <AvatarImage src={comment.authorAvatarUrl || ''} />
+                        <AvatarImage src={comment.authorAvatarUrl ? attachmentSrc(comment.authorAvatarUrl) : ''} />
                         <AvatarFallback className={`text-sm font-bold ${comment.isAdmin ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
                           {comment.authorName.charAt(0).toUpperCase()}
                         </AvatarFallback>
@@ -314,7 +315,7 @@ function PostInteractions({ postId }: { postId: number }) {
                       </div>
                       <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">{comment.content}</p>
                     </div>
-                    {(isSignedIn && comment.authorClerkId === user?.id) || (isSignedIn) ? (
+                    {isSignedIn ? (
                       comment.authorClerkId === user?.id ? (
                         <button
                           onClick={() => handleDelete(comment.id)}

@@ -1,17 +1,15 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
-import { clerkMiddleware } from "@clerk/express";
-import { publishableKeyFromHost } from "@clerk/shared/keys";
 import router from "./routes";
 import { logger } from "./lib/logger";
-import {
-  CLERK_PROXY_PATH,
-  clerkProxyMiddleware,
-  getClerkProxyHost,
-} from "./middlewares/clerkProxyMiddleware";
+import { sessionMiddleware } from "./middlewares/session";
 
 const app: Express = express();
+
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
 
 app.use(
   pinoHttp({
@@ -32,9 +30,6 @@ app.use(
     },
   }),
 );
-
-// Must be mounted before body parsers (the proxy streams raw bytes).
-app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
 // In production, validate against an explicit allowlist from CORS_ALLOWED_ORIGINS
 // (comma-separated). Falls back to origin:true in development for convenience.
@@ -65,15 +60,7 @@ const corsOrigin: cors.CorsOptions["origin"] = (() => {
 app.use(cors({ credentials: true, origin: corsOrigin }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-app.use(
-  clerkMiddleware((req) => ({
-    publishableKey: publishableKeyFromHost(
-      getClerkProxyHost(req) ?? "",
-      process.env.CLERK_PUBLISHABLE_KEY,
-    ),
-  })),
-);
+app.use(sessionMiddleware);
 
 app.use("/api", router);
 

@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { ensureSessionTable } from "./middlewares/session";
 
 const rawPort = process.env["PORT"];
 
@@ -15,11 +16,18 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, "0.0.0.0", (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
+ensureSessionTable()
+  .catch((err) => {
+    logger.error({ err }, "Failed to ensure session table exists");
     process.exit(1);
-  }
+  })
+  .then(() => {
+    app.listen(port, "0.0.0.0", (err) => {
+      if (err) {
+        logger.error({ err }, "Error listening on port");
+        process.exit(1);
+      }
 
-  logger.info({ port, host: "0.0.0.0" }, "Server listening");
-});
+      logger.info({ port, host: "0.0.0.0" }, "Server listening");
+    });
+  });

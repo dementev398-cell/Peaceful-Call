@@ -3,14 +3,14 @@ import { ScrollReveal } from './ScrollReveal';
 import { useContentDict } from '@/hooks/use-content';
 import { FaYoutube, FaTelegramPlane, FaInstagram, FaTiktok } from 'react-icons/fa';
 import { Link } from 'wouter';
-import { useUser } from '@clerk/react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Heart } from 'lucide-react';
 import { useGetMe } from '@workspace/api-client-react';
 
 export function Footer() {
   const { t, isRtl } = useLanguage();
   const { dict } = useContentDict();
-  const { isSignedIn } = useUser();
+  const { isSignedIn } = useAuth();
   const { data: me } = useGetMe();
   const isAdmin = !!me && (me.role === 'owner' || me.role === 'editor');
 

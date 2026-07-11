@@ -9,13 +9,13 @@ import { Donate } from '@/components/Donate';
 import { Footer } from '@/components/Footer';
 import { RecentPosts } from '@/components/RecentPosts';
 import { Redirect } from 'wouter';
-import { useUser } from '@clerk/react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 
 export default function Home() {
-  const { isLoaded, isSignedIn } = useUser();
+  const { isLoaded, isSignedIn } = useAuth();
 
   // Captured once at mount, not recomputed on every render. If we recomputed
   // this live, navigating away (e.g. to /quran) clears window.location.hash

@@ -14,16 +14,17 @@ import HadithsPage from '@/pages/HadithsPage';
 import QuranPage from '@/pages/QuranPage';
 import SingleHadithPage from '@/pages/SingleHadithPage';
 import { Route, Switch, Router as WouterRouter, useLocation, Link } from 'wouter';
-import { ClerkProvider, SignIn, SignUp, Show, useClerk } from '@clerk/react';
-import { publishableKeyFromHost } from '@clerk/react/internal';
-import { ruRU, enUS, arSA } from '@clerk/localizations';
 import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import { ArrowLeft } from 'lucide-react';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { ArrowLeft, Loader2 } from 'lucide-react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { NicknameGate } from '@/components/NicknameGate';
 import { setBaseUrl } from '@workspace/api-client-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 // Configure API base URL for cross-origin deployments (e.g. Render static site
 // calling a separate API service). Defaults to '' (relative paths) which works
@@ -35,65 +36,7 @@ if (apiBaseUrl) {
 
 const queryClient = new QueryClient();
 
-const clerkPubKey = publishableKeyFromHost(
-  window.location.hostname,
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
-);
-
-const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
-
-function stripBase(path: string): string {
-  return basePath && path.startsWith(basePath)
-    ? path.slice(basePath.length) || '/'
-    : path;
-}
-
-if (!clerkPubKey) {
-  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in .env file');
-}
-
-const clerkAppearance = {
-  cssLayerName: 'clerk',
-  layout: {
-    // Remove Clerk's "Development mode" badge from the components.
-    unsafe_disableDevelopmentModeWarnings: true,
-  },
-  variables: {
-    colorPrimary: 'hsl(43 85% 58%)',
-    colorForeground: 'hsl(40 10% 96%)',
-    colorMutedForeground: 'hsl(220 12% 65%)',
-    colorDanger: 'hsl(0 70% 52%)',
-    colorBackground: 'hsl(224 24% 4%)',
-    colorInput: 'hsl(224 16% 12%)',
-    colorInputForeground: 'hsl(40 10% 96%)',
-    colorNeutral: 'hsl(224 16% 12%)',
-    colorText: 'hsl(40 10% 96%)',
-    colorTextSecondary: 'hsl(220 12% 65%)',
-    colorTextOnPrimaryBackground: 'hsl(224 24% 4%)',
-    fontFamily: "'Plus Jakarta Sans', sans-serif",
-    borderRadius: '0.75rem',
-  },
-  elements: {
-    // The branded logo lives in AuthShell, so hide Clerk's built-in one.
-    logoBox: 'hidden',
-    rootBox: 'w-full flex justify-center px-4',
-    cardBox: 'rounded-[2rem] w-[440px] max-w-full overflow-hidden shadow-2xl border border-white/10 glass-strong',
-    card: '!shadow-none !border-0 !bg-transparent !rounded-none p-6 sm:p-8',
-    footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
-    headerTitle: 'font-serif text-3xl font-bold tracking-tight',
-    headerSubtitle: '!text-[hsl(220_12%_65%)] font-serif text-sm mt-1',
-    formButtonPrimary: 'rounded-full h-12 text-sm font-bold tracking-widest uppercase transition-all glow-gold shadow-lg shadow-primary/20 !text-[hsl(224_24%_4%)] hover:!brightness-110 hover:scale-[1.02] active:scale-[0.98]',
-    socialButtonsBlockButton: 'rounded-xl h-12 !border-white/10 !text-[hsl(40_10%_96%)] hover:!bg-white/5 hover:!border-white/20 transition-all',
-    socialButtonsBlockButtonText: '!text-[hsl(40_10%_96%)] font-semibold',
-    formFieldInput: 'rounded-xl h-12 !bg-[hsl(224_20%_8%)] !border-white/10 hover:!border-white/20 focus:!border-[hsl(43_85%_58%)] focus:!ring-1 focus:!ring-[hsl(43_85%_58%)] transition-all shadow-inner',
-    formFieldLabel: '!text-[hsl(220_12%_65%)] text-xs font-semibold tracking-wide uppercase',
-    identityPreviewText: '!text-[hsl(40_10%_96%)]',
-    dividerText: '!text-[hsl(220_12%_65%)]',
-    dividerLine: '!bg-white/10',
-    alternativeMethodsBlockButton: '!text-[hsl(40_10%_96%)]',
-  },
-};
 
 function AuthShell({ children }: { children: ReactNode }) {
   const { t, isRtl } = useLanguage();
@@ -136,58 +79,198 @@ function AuthShell({ children }: { children: ReactNode }) {
         </div>
       </Link>
 
-      <div className="relative z-10 flex w-full justify-center">{children}</div>
+      <div className="relative z-10 flex w-full justify-center">
+        <div className="w-[440px] max-w-full overflow-hidden rounded-[2rem] border border-white/10 glass-strong shadow-2xl">
+          <div className="p-6 sm:p-8">{children}</div>
+        </div>
+      </div>
     </div>
   );
 }
 
 function SignInPage() {
+  const { t } = useLanguage();
+  const { login } = useAuth();
+  const [, setLocation] = useLocation();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await login(email, password);
+      setLocation('/portal');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('auth.genericError'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <AuthShell>
-      <SignIn
-        routing="path"
-        path={`${basePath}/sign-in`}
-        signUpUrl={`${basePath}/sign-up`}
-      />
+      <h1 className="font-serif text-3xl font-bold tracking-tight">{t('auth.signInTitle')}</h1>
+      <p className="mt-1 text-sm text-muted-foreground">{t('auth.signInSubtitle')}</p>
+
+      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="signin-email" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {t('auth.email')}
+          </Label>
+          <Input
+            id="signin-email"
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder={t('auth.emailPlaceholder')}
+            className="h-12 rounded-xl"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="signin-password" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {t('auth.password')}
+          </Label>
+          <Input
+            id="signin-password"
+            type="password"
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={t('auth.passwordPlaceholder')}
+            className="h-12 rounded-xl"
+          />
+        </div>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full h-12 rounded-full text-sm font-bold tracking-widest uppercase glow-gold gap-2"
+        >
+          {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+          {t('auth.signInButton')}
+        </Button>
+
+        <p className="text-center text-sm text-muted-foreground">
+          {t('auth.noAccount')}{' '}
+          <Link href="/sign-up" className="font-semibold text-primary hover:underline">
+            {t('auth.signUpButton')}
+          </Link>
+        </p>
+      </form>
     </AuthShell>
   );
 }
 
 function SignUpPage() {
+  const { t } = useLanguage();
+  const { register } = useAuth();
+  const [, setLocation] = useLocation();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await register(email, password, name);
+      setLocation('/portal');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('auth.genericError'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <AuthShell>
-      <SignUp
-        routing="path"
-        path={`${basePath}/sign-up`}
-        signInUrl={`${basePath}/sign-in`}
-      />
+      <h1 className="font-serif text-3xl font-bold tracking-tight">{t('auth.signUpTitle')}</h1>
+      <p className="mt-1 text-sm text-muted-foreground">{t('auth.signUpSubtitle')}</p>
+
+      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="signup-name" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {t('auth.name')} <span className="opacity-60">({t('auth.nameOptional')})</span>
+          </Label>
+          <Input
+            id="signup-name"
+            type="text"
+            autoComplete="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t('auth.namePlaceholder')}
+            className="h-12 rounded-xl"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="signup-email" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {t('auth.email')}
+          </Label>
+          <Input
+            id="signup-email"
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder={t('auth.emailPlaceholder')}
+            className="h-12 rounded-xl"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="signup-password" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {t('auth.password')}
+          </Label>
+          <Input
+            id="signup-password"
+            type="password"
+            required
+            minLength={8}
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={t('auth.signUpPasswordPlaceholder')}
+            className="h-12 rounded-xl"
+          />
+        </div>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full h-12 rounded-full text-sm font-bold tracking-widest uppercase glow-gold gap-2"
+        >
+          {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+          {t('auth.signUpButton')}
+        </Button>
+
+        <p className="text-center text-sm text-muted-foreground">
+          {t('auth.haveAccount')}{' '}
+          <Link href="/sign-in" className="font-semibold text-primary hover:underline">
+            {t('auth.signInButton')}
+          </Link>
+        </p>
+      </form>
     </AuthShell>
   );
 }
 
-function ClerkQueryClientCacheInvalidator() {
-  const { addListener } = useClerk();
-  const prevUserIdRef = useRef<string | null | undefined>(undefined);
-
-  useEffect(() => {
-    const unsubscribe = addListener(({ user }) => {
-      const userId = user?.id ?? null;
-      if (
-        prevUserIdRef.current !== undefined &&
-        prevUserIdRef.current !== userId
-      ) {
-        queryClient.clear();
-      }
-      prevUserIdRef.current = userId;
-    });
-    return unsubscribe;
-  }, [addListener]);
-
-  return null;
-}
-
 function Router() {
   const [location] = useLocation();
+  const { isSignedIn, isLoaded } = useAuth();
 
   return (
     <AnimatePresence mode="wait">
@@ -209,32 +292,25 @@ function Router() {
           <Route path="/quran" component={QuranPage} />
 
           <Route path="/portal">
-            <Show when="signed-in">
+            {!isLoaded ? null : isSignedIn ? (
               <NicknameGate>
                 <PortalPage />
               </NicknameGate>
-            </Show>
-            <Show when="signed-out">
+            ) : (
               <SignInPage />
-            </Show>
+            )}
           </Route>
           <Route path="/messages">
-            <Show when="signed-in">
+            {!isLoaded ? null : isSignedIn ? (
               <NicknameGate>
                 <MessagesPage />
               </NicknameGate>
-            </Show>
-            <Show when="signed-out">
+            ) : (
               <SignInPage />
-            </Show>
+            )}
           </Route>
           <Route path="/profile">
-            <Show when="signed-in">
-              <ProfilePage />
-            </Show>
-            <Show when="signed-out">
-              <SignInPage />
-            </Show>
+            {!isLoaded ? null : isSignedIn ? <ProfilePage /> : <SignInPage />}
           </Route>
           <Route path="/admin" component={AdminPage} />
           <Route path="/admins" component={AdminsPage} />
@@ -246,118 +322,17 @@ function Router() {
   );
 }
 
-function ClerkProviderWithRoutes() {
-  const [, setLocation] = useLocation();
-  const { language } = useLanguage();
-  const baseLocalization =
-    language === 'RU' ? ruRU : language === 'AR' ? arSA : enUS;
-  const authText = {
-    RU: {
-      signInTitle: 'С возвращением',
-      signInSubtitle: 'Войдите, чтобы продолжить',
-      signUpTitle: 'Создайте аккаунт',
-      signUpSubtitle: 'Присоединяйтесь к сообществу',
-    },
-    EN: {
-      signInTitle: 'Welcome back',
-      signInSubtitle: 'Sign in to continue',
-      signUpTitle: 'Create your account',
-      signUpSubtitle: 'Join the community',
-    },
-    AR: {
-      signInTitle: 'مرحبًا بعودتك',
-      signInSubtitle: 'سجّل الدخول للمتابعة',
-      signUpTitle: 'أنشئ حسابك',
-      signUpSubtitle: 'انضم إلى المجتمع',
-    },
-  }[language];
-  // @clerk/localizations deliberately leaves some field placeholders as
-  // `undefined` for RU/AR (they fall back to English at render time), which
-  // is why the email/password/name inputs showed English text even when the
-  // rest of the UI was in Russian or Arabic. We fill those gaps explicitly.
-  const placeholderOverrides = {
-    RU: {
-      emailAddress: 'Введите ваш email',
-      password: 'Введите ваш пароль',
-      signUpPassword: 'Придумайте пароль',
-      firstName: 'Имя',
-      lastName: 'Фамилия',
-      username: 'Имя пользователя',
-    },
-    EN: undefined,
-    AR: {
-      emailAddress: 'أدخل بريدك الإلكتروني',
-      password: 'أدخل كلمة المرور',
-      signUpPassword: 'أنشئ كلمة مرور',
-      firstName: 'الاسم الأول',
-      lastName: 'اسم العائلة',
-      username: 'اسم المستخدم',
-    },
-  }[language];
-  const clerkLocalization = {
-    ...baseLocalization,
-    formFieldInputPlaceholder__emailAddress:
-      placeholderOverrides?.emailAddress ??
-      baseLocalization.formFieldInputPlaceholder__emailAddress,
-    formFieldInputPlaceholder__password:
-      placeholderOverrides?.password ??
-      baseLocalization.formFieldInputPlaceholder__password,
-    formFieldInputPlaceholder__signUpPassword:
-      placeholderOverrides?.signUpPassword ??
-      baseLocalization.formFieldInputPlaceholder__signUpPassword,
-    formFieldInputPlaceholder__firstName:
-      placeholderOverrides?.firstName ??
-      baseLocalization.formFieldInputPlaceholder__firstName,
-    formFieldInputPlaceholder__lastName:
-      placeholderOverrides?.lastName ??
-      baseLocalization.formFieldInputPlaceholder__lastName,
-    formFieldInputPlaceholder__username:
-      placeholderOverrides?.username ??
-      baseLocalization.formFieldInputPlaceholder__username,
-    signIn: {
-      ...baseLocalization.signIn,
-      start: {
-        ...baseLocalization.signIn?.start,
-        title: authText.signInTitle,
-        subtitle: authText.signInSubtitle,
-      },
-    },
-    signUp: {
-      ...baseLocalization.signUp,
-      start: {
-        ...baseLocalization.signUp?.start,
-        title: authText.signUpTitle,
-        subtitle: authText.signUpSubtitle,
-      },
-    },
-  };
-
-  return (
-    <ClerkProvider
-      publishableKey={clerkPubKey}
-      proxyUrl={clerkProxyUrl}
-      appearance={clerkAppearance}
-      signInUrl={`${basePath}/sign-in`}
-      signUpUrl={`${basePath}/sign-up`}
-      localization={clerkLocalization as typeof baseLocalization}
-      routerPush={(to) => setLocation(stripBase(to))}
-      routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
-    >
-      <QueryClientProvider client={queryClient}>
-        <ClerkQueryClientCacheInvalidator />
-        <Router />
-      </QueryClientProvider>
-    </ClerkProvider>
-  );
-}
-
 function App() {
   return (
     <ThemeProvider>
       <LanguageProvider>
         <TooltipProvider>
           <WouterRouter base={basePath}>
-            <ClerkProviderWithRoutes />
+            <QueryClientProvider client={queryClient}>
+              <AuthProvider>
+                <Router />
+              </AuthProvider>
+            </QueryClientProvider>
           </WouterRouter>
           <Toaster />
         </TooltipProvider>

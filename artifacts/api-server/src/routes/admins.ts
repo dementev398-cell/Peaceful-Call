@@ -1,13 +1,14 @@
 import { Router, type IRouter } from "express";
 import { eq, count, or } from "drizzle-orm";
-import { clerkClient } from "@clerk/express";
-import { db, adminsTable, conversationsTable, chatMessagesTable, chatMessageDeletionsTable, appUsersTable } from "@workspace/db";
+import { z } from "zod";
+import { db, adminsTable, conversationsTable, chatMessagesTable, chatMessageDeletionsTable, appUsersTable, usersTable } from "@workspace/db";
 import {
   ListAdminsResponse,
   CreateAdminBody,
   CreateAdminResponse,
 } from "@workspace/api-zod";
 import { requireOwner, requireAdmin } from "../middlewares/adminAuth";
+import { hashPassword } from "../lib/passwords";
 
 const router: IRouter = Router();
 
@@ -27,10 +28,10 @@ router.post("/admins", requireOwner, async (req, res): Promise<void> => {
     return;
   }
 
-  const { data: userList } = await clerkClient.users.getUserList({
-    emailAddress: [parsed.data.email],
-  });
-  const user = userList[0];
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.email, parsed.data.email.toLowerCase()));
 
   if (!user) {
     res.status(404).json({
@@ -40,12 +41,12 @@ router.post("/admins", requireOwner, async (req, res): Promise<void> => {
     return;
   }
 
-  const name = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+  const name = user.name ?? "";
 
   const [admin] = await db
     .insert(adminsTable)
     .values({
-      clerkUserId: user.id,
+      clerkUserId: String(user.id),
       email: parsed.data.email,
       name,
       role: parsed.data.role ?? "editor",
@@ -152,18 +153,16 @@ router.delete("/admins/:id", requireOwner, async (req, res): Promise<void> => {
 
 // ── User management (owner/admin only) ──────────────────────────────────────
 
-// GET /admins/clerk-users — list all Clerk users (admin only)
-router.get("/admins/clerk-users", requireAdmin, async (_req, res): Promise<void> => {
+// GET /admins/users — list all local users (admin only)
+router.get("/admins/users", requireAdmin, async (_req, res): Promise<void> => {
   try {
-    const { data: users } = await clerkClient.users.getUserList({ limit: 200 });
+    const users = await db.select().from(usersTable).orderBy(usersTable.createdAt);
     const safeUsers = users.map((u) => ({
-      id: u.id,
-      firstName: u.firstName ?? "",
-      lastName: u.lastName ?? "",
-      email: u.emailAddresses[0]?.emailAddress ?? "",
-      imageUrl: u.imageUrl,
-      banned: u.banned,
-      createdAt: new Date(u.createdAt).toISOString(),
+      id: String(u.id),
+      name: u.name ?? "",
+      email: u.email,
+      banned: u.isBanned,
+      createdAt: u.createdAt,
     }));
     res.json(safeUsers);
   } catch (err: any) {
@@ -171,34 +170,64 @@ router.get("/admins/clerk-users", requireAdmin, async (_req, res): Promise<void>
   }
 });
 
-// POST /admins/clerk-users/:id/ban
-router.post("/admins/clerk-users/:id/ban", requireAdmin, async (req, res): Promise<void> => {
-  const id = String(req.params.id);
+// POST /admins/users/:id/ban
+router.post("/admins/users/:id/ban", requireAdmin, async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
   try {
-    await clerkClient.users.banUser(id);
+    await db.update(usersTable).set({ isBanned: true }).where(eq(usersTable.id, id));
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Failed to ban user" });
   }
 });
 
-// POST /admins/clerk-users/:id/unban
-router.post("/admins/clerk-users/:id/unban", requireAdmin, async (req, res): Promise<void> => {
-  const id = String(req.params.id);
+// POST /admins/users/:id/unban
+router.post("/admins/users/:id/unban", requireAdmin, async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
   try {
-    await clerkClient.users.unbanUser(id);
+    await db.update(usersTable).set({ isBanned: false }).where(eq(usersTable.id, id));
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Failed to unban user" });
   }
 });
 
-// DELETE /admins/clerk-users/:id — cascade: remove from admins, delete chats/messages
-router.delete("/admins/clerk-users/:id", requireOwner, async (req, res): Promise<void> => {
-  const clerkId = String(req.params.id);
+const ResetPasswordBody = z.object({
+  newPassword: z.string().min(8).max(200),
+});
+
+// POST /admins/users/:id/reset-password — owner-only fallback for the
+// no-transactional-email password-recovery flow.
+router.post("/admins/users/:id/reset-password", requireOwner, async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  const parsed = ResetPasswordBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  try {
+    const passwordHash = await hashPassword(parsed.data.newPassword);
+    const [updated] = await db
+      .update(usersTable)
+      .set({ passwordHash })
+      .where(eq(usersTable.id, id))
+      .returning();
+    if (!updated) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to reset password" });
+  }
+});
+
+// DELETE /admins/users/:id — cascade: remove from admins, delete chats/messages
+router.delete("/admins/users/:id", requireOwner, async (req, res): Promise<void> => {
+  const userIdStr = String(req.params.id);
   try {
     // 1) Remove from admins table (strips any admin rights immediately)
-    await db.delete(adminsTable).where(eq(adminsTable.clerkUserId, clerkId));
+    await db.delete(adminsTable).where(eq(adminsTable.clerkUserId, userIdStr));
 
     // 2) Find all conversations this user participates in
     const userConvs = await db
@@ -206,8 +235,8 @@ router.delete("/admins/clerk-users/:id", requireOwner, async (req, res): Promise
       .from(conversationsTable)
       .where(
         or(
-          eq(conversationsTable.userAClerkId, clerkId),
-          eq(conversationsTable.userBClerkId, clerkId),
+          eq(conversationsTable.userAClerkId, userIdStr),
+          eq(conversationsTable.userBClerkId, userIdStr),
         ),
       );
 
@@ -217,7 +246,7 @@ router.delete("/admins/clerk-users/:id", requireOwner, async (req, res): Promise
       // 3) Delete per-user hidden-message rows for deleted user's messages in those convs
       await db
         .delete(chatMessageDeletionsTable)
-        .where(eq(chatMessageDeletionsTable.clerkUserId, clerkId));
+        .where(eq(chatMessageDeletionsTable.clerkUserId, userIdStr));
 
       // 4) Delete all messages in those conversations (affects both sides)
       for (const convId of convIds) {
@@ -247,10 +276,10 @@ router.delete("/admins/clerk-users/:id", requireOwner, async (req, res): Promise
     // 6) Remove from app_users mirror table
     await db
       .delete(appUsersTable)
-      .where(eq(appUsersTable.clerkUserId, clerkId));
+      .where(eq(appUsersTable.clerkUserId, userIdStr));
 
-    // 7) Finally delete from Clerk
-    await clerkClient.users.deleteUser(clerkId);
+    // 7) Finally delete the local account
+    await db.delete(usersTable).where(eq(usersTable.id, Number(userIdStr)));
 
     res.json({ success: true });
   } catch (err: any) {
