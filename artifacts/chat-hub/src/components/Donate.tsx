@@ -1,0 +1,80 @@
+import { useLanguage } from '@/contexts/LanguageContext';
+import { ScrollReveal } from './ScrollReveal';
+import { useContentDict } from '@/hooks/use-content';
+import { Heart, ExternalLink } from 'lucide-react';
+
+export function Donate() {
+  const { t, isRtl } = useLanguage();
+  const { dict } = useContentDict();
+
+  const qrImage = dict['donation.qr_image'] || '/donate-qr.png';
+  const walletNote = dict['donation.wallet_note'] || 'USDT (TRC20)';
+
+  return (
+    <section id="donate" className="py-24 md:py-32 relative overflow-hidden" dir="ltr">
+      <div className="absolute inset-0 bg-primary/5 pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[radial-gradient(circle,hsl(var(--primary)/0.1),transparent_60%)] blur-3xl pointer-events-none" />
+
+      <div className="container mx-auto px-5 sm:px-6 max-w-4xl relative z-10">
+        <div className="glass-strong border border-primary/20 rounded-[3rem] p-8 md:p-16 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-primary/20 to-transparent opacity-80 rounded-tl-[3rem]" />
+          <div className="absolute bottom-0 right-0 w-32 h-32 bg-gradient-to-tl from-primary/20 to-transparent opacity-80 rounded-br-[3rem]" />
+
+          <ScrollReveal>
+            <div className="text-center mb-12 relative z-10" dir={isRtl ? 'rtl' : 'ltr'}>
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-[1.5rem] bg-background/50 border border-primary/30 mb-6 shadow-inner glass">
+                <Heart className="w-8 h-8 text-primary fill-primary/40 drop-shadow-sm" />
+              </div>
+              <h2 className="text-3xl md:text-5xl font-serif font-bold text-foreground mb-6 drop-shadow-md">
+                {t('support.title')}
+              </h2>
+              <div className="w-20 h-1 bg-gradient-to-r from-transparent via-primary to-transparent mx-auto mb-6 rounded-full opacity-80" />
+              <p className="text-lg md:text-xl text-foreground/80 max-w-xl mx-auto font-serif leading-relaxed">
+                {t('support.text')}
+              </p>
+            </div>
+          </ScrollReveal>
+
+          <ScrollReveal delay="100">
+            <div className="flex flex-col items-center relative z-10 gap-8">
+              {/* QR Code */}
+              <div className="bg-white p-4 rounded-3xl shadow-[0_0_40px_rgba(240,160,32,0.15)] border border-primary/20 relative group">
+                <div className="absolute inset-0 border-2 border-primary/50 rounded-3xl scale-105 opacity-0 group-hover:opacity-100 group-hover:scale-100 transition-all duration-500 pointer-events-none"></div>
+                <img
+                  src={qrImage}
+                  alt="Donation QR Code"
+                  className="w-48 h-48 md:w-64 md:h-64 object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+
+              <div className="bg-background/80 glass px-6 py-3 rounded-full border border-border/50 shadow-inner">
+                <span className="font-mono text-sm md:text-base font-semibold text-foreground tracking-widest drop-shadow-sm">
+                  {walletNote}
+                </span>
+              </div>
+
+              {/* Primary donation button */}
+              <a
+                href="https://new.donatepay.ru/@PeacefulCall"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-3 px-10 py-5 rounded-full bg-primary text-primary-foreground font-bold text-sm md:text-base uppercase tracking-widest hover:brightness-110 transition-all glow-gold shadow-[0_10px_30px_rgba(240,160,32,0.3)] hover:shadow-[0_15px_40px_rgba(240,160,32,0.4)]"
+              >
+                <Heart className="w-5 h-5 fill-primary-foreground/60" />
+                {t('support.button')}
+                <ExternalLink className="w-4 h-4 opacity-70" />
+              </a>
+
+              <p className="text-xs text-primary/70 font-semibold uppercase tracking-[0.2em] text-center">
+                {t('support.accepted')}
+              </p>
+            </div>
+          </ScrollReveal>
+        </div>
+      </div>
+    </section>
+  );
+}

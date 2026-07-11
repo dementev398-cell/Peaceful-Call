@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Peaceful Call"
+version = "1.0.0"
+id = "artifacts/chat-hub"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21576
+
+[services.development]
+run = "pnpm --filter @workspace/chat-hub run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/chat-hub", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/chat-hub/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21576"
+BASE_PATH = "/"

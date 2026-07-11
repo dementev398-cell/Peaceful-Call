@@ -3,13 +3,36 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Стильный призыв API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: me
+    description: Current admin session
+  - name: content
+    description: Site CMS content
+  - name: posts
+    description: Blog posts
+  - name: post-interactions
+    description: Comments and reactions on posts
+  - name: hadiths
+    description: Hadiths with authenticity grading
+  - name: hadith-interactions
+    description: Comments and reactions on hadiths
+  - name: admins
+    description: Admin/team management
+  - name: messages
+    description: Contact inbox messages
+  - name: chat
+    description: Direct and support chat
+  - name: storage
+    description: File storage
+  - name: user-profiles
+    description: User nickname and custom avatar profiles
+
 paths:
   /healthz:
     get:
@@ -23,14 +46,1626 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthStatus"
+                $ref: "#/components/schemas/HealthCheckPayload"
+
+  /me:
+    get:
+      operationId: getMe
+      tags: [me]
+      summary: Get current admin (null if not an admin)
+      responses:
+        "200":
+          description: Current admin or null
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetMePayload"
+
+  # ── Content ────────────────────────────────────────────────────────────
+  /content:
+    get:
+      operationId: listContent
+      tags: [content]
+      summary: List all site content items
+      responses:
+        "200":
+          description: Content items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListContentPayload"
+    put:
+      operationId: upsertContent
+      tags: [content]
+      summary: Upsert content items (owner only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertContentInput"
+      responses:
+        "200":
+          description: Updated content items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpsertContentPayload"
+
+  /content/{key}:
+    delete:
+      operationId: deleteContent
+      tags: [content]
+      summary: Delete a content item (owner only)
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
+
+  # ── Posts ──────────────────────────────────────────────────────────────
+  /posts:
+    get:
+      operationId: listPosts
+      tags: [posts]
+      summary: List published posts
+      responses:
+        "200":
+          description: Posts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListPostsPayload"
+    post:
+      operationId: createPost
+      tags: [posts]
+      summary: Create a post (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatePostPayload"
+
+  /posts/mine:
+    get:
+      operationId: listMyPosts
+      tags: [posts]
+      summary: List posts editable by current admin (own posts, or all if owner)
+      responses:
+        "200":
+          description: Posts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListMyPostsPayload"
+
+  /posts/{slug}:
+    get:
+      operationId: getPostBySlug
+      tags: [posts]
+      summary: Get a published post by slug
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetPostBySlugPayload"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
+
+  /posts/id/{id}:
+    patch:
+      operationId: updatePost
+      tags: [posts]
+      summary: Update a post (owner, or editor for own post)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdatePostPayload"
+        "403":
+          description: Not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
+    delete:
+      operationId: deletePost
+      tags: [posts]
+      summary: Delete a post (owner, or editor for own post)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
+
+  # ── Post interactions ──────────────────────────────────────────────────
+  /posts/{id}/interactions:
+    get:
+      operationId: getPostInteractions
+      tags: [post-interactions]
+      summary: Get comments and reaction counts for a post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Interactions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostInteractions"
+
+  /posts/{id}/comments:
+    post:
+      operationId: createPostComment
+      tags: [post-interactions]
+      summary: Add a comment to a post (signed-in users only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostComment"
+
+  /posts/{id}/comments/{commentId}:
+    delete:
+      operationId: deletePostComment
+      tags: [post-interactions]
+      summary: Delete a comment (own comment or admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: commentId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /posts/{id}/react:
+    post:
+      operationId: reactToPost
+      tags: [post-interactions]
+      summary: Like or dislike a post (toggle, signed-in users only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReactionInput"
+      responses:
+        "200":
+          description: Current reaction state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReactToPostPayload"
+
+  # ── Hadiths ────────────────────────────────────────────────────────────
+  /hadiths:
+    get:
+      operationId: listHadiths
+      tags: [hadiths]
+      summary: List published hadiths
+      parameters:
+        - name: grade
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/HadithGrade"
+        - name: topic
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Hadiths
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListHadithsPayload"
+    post:
+      operationId: createHadith
+      tags: [hadiths]
+      summary: Create a hadith (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HadithInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateHadithPayload"
+
+  /hadiths/mine:
+    get:
+      operationId: listMyHadiths
+      tags: [hadiths]
+      summary: List hadiths editable by current admin (own, or all if owner)
+      responses:
+        "200":
+          description: Hadiths
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListMyHadithsPayload"
+
+  /hadiths/{id}:
+    get:
+      operationId: getHadith
+      tags: [hadiths]
+      summary: Get a single published hadith
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Hadith
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetHadithPayload"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
+    patch:
+      operationId: updateHadith
+      tags: [hadiths]
+      summary: Update a hadith (owner, or editor for own hadith)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HadithUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateHadithPayload"
+        "403":
+          description: Not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
+    delete:
+      operationId: deleteHadith
+      tags: [hadiths]
+      summary: Delete a hadith (owner, or editor for own hadith)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
+
+  # ── Admins ─────────────────────────────────────────────────────────────
+  /admins:
+    get:
+      operationId: listAdmins
+      tags: [admins]
+      summary: List admins/team (public)
+      responses:
+        "200":
+          description: Admins
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAdminsPayload"
+    post:
+      operationId: createAdmin
+      tags: [admins]
+      summary: Promote an existing Clerk user to admin (owner only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateAdminPayload"
+
+  /admins/{id}/role:
+    patch:
+      operationId: updateAdminRole
+      tags: [admins]
+      summary: Change an admin's role, optionally transferring ownership (owner only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRoleUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Admin"
+
+  /admins/{id}:
+    delete:
+      operationId: deleteAdmin
+      tags: [admins]
+      summary: Remove an admin (owner only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /admins/clerk-users:
+    get:
+      operationId: listClerkUsers
+      tags: [admins]
+      summary: List all registered Clerk users (admin only)
+      responses:
+        "200":
+          description: Clerk users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClerkUserSummary"
+
+  /admins/clerk-users/{id}/ban:
+    post:
+      operationId: banClerkUser
+      tags: [admins]
+      summary: Ban a user (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessPayload"
+
+  /admins/clerk-users/{id}/unban:
+    post:
+      operationId: unbanClerkUser
+      tags: [admins]
+      summary: Unban a user (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessPayload"
+
+  /admins/clerk-users/{id}:
+    delete:
+      operationId: deleteClerkUser
+      tags: [admins]
+      summary: Delete a user account (owner only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessPayload"
+
+  # ── Messages (contact inbox) ───────────────────────────────────────────
+  /messages:
+    get:
+      operationId: listMessages
+      tags: [messages]
+      summary: List inbox messages (admin only)
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListMessagesPayload"
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a contact message (public)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "201":
+          description: Sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendMessagePayload"
+
+  /messages/unread-count:
+    get:
+      operationId: getUnreadCount
+      tags: [messages]
+      summary: Get unread message count (admin only)
+      responses:
+        "200":
+          description: Count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetUnreadCountPayload"
+
+  /messages/{id}:
+    get:
+      operationId: getMessage
+      tags: [messages]
+      summary: Get a message with its replies (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Message with replies
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetMessagePayload"
+    delete:
+      operationId: deleteMessage
+      tags: [messages]
+      summary: Delete a message (owner only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /messages/{id}/read:
+    patch:
+      operationId: markMessageRead
+      tags: [messages]
+      summary: Mark a message as read (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarkMessageReadPayload"
+
+  /messages/{id}/reply:
+    post:
+      operationId: replyToMessage
+      tags: [messages]
+      summary: Reply to a message (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplyInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReplyToMessagePayload"
+
+  # ── Chat ───────────────────────────────────────────────────────────────
+  /chat/users:
+    get:
+      operationId: listChatUsers
+      tags: [chat]
+      summary: Search app users to start a chat with
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListChatUsersPayload"
+
+  /chat/conversations:
+    get:
+      operationId: listConversations
+      tags: [chat]
+      summary: List current user's conversations
+      responses:
+        "200":
+          description: Conversations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListConversationsPayload"
+
+  /chat/conversations/support:
+    post:
+      operationId: startSupportConversation
+      tags: [chat]
+      summary: Start or fetch the current user's support conversation
+      responses:
+        "200":
+          description: Existing conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartSupportConversationPayload"
+        "201":
+          description: Created conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartSupportConversationPayload"
+
+  /chat/conversations/direct:
+    post:
+      operationId: startDirectConversation
+      tags: [chat]
+      summary: Start or fetch a direct conversation with another user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartDirectConversationInput"
+      responses:
+        "200":
+          description: Existing conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartDirectConversationPayload"
+        "201":
+          description: Created conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartDirectConversationPayload"
+
+  /chat/conversations/{id}/messages:
+    get:
+      operationId: listChatMessages
+      tags: [chat]
+      summary: List messages in a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListChatMessagesPayload"
+    post:
+      operationId: sendChatMessage
+      tags: [chat]
+      summary: Send a message in a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMessageInput"
+      responses:
+        "201":
+          description: Sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendChatMessagePayload"
+
+  /chat/conversations/{id}/read:
+    patch:
+      operationId: markConversationRead
+      tags: [chat]
+      summary: Mark a conversation as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Marked read
+
+  /chat/messages/{id}:
+    delete:
+      operationId: deleteChatMessage
+      tags: [chat]
+      summary: Delete a chat message (for me or for everyone)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [me, everyone]
+            default: me
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
+
+  /chat/messages/{id}/forward:
+    post:
+      operationId: forwardChatMessage
+      tags: [chat]
+      summary: Forward a message to another conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForwardChatMessageInput"
+      responses:
+        "201":
+          description: Forwarded message created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendChatMessagePayload"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
+
+  # ── Hadith interactions ────────────────────────────────────────────────
+  /hadiths/{id}/interactions:
+    get:
+      operationId: getHadithInteractions
+      tags: [hadith-interactions]
+      summary: Get comments and reaction counts for a hadith
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Interactions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HadithInteractions"
+
+  /hadiths/{id}/comments:
+    post:
+      operationId: createHadithComment
+      tags: [hadith-interactions]
+      summary: Add a comment to a hadith (signed-in users only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HadithComment"
+
+  /hadiths/{id}/comments/{commentId}:
+    delete:
+      operationId: deleteHadithComment
+      tags: [hadith-interactions]
+      summary: Delete a hadith comment (own comment or admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: commentId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /hadiths/{id}/react:
+    post:
+      operationId: reactToHadith
+      tags: [hadith-interactions]
+      summary: Like or dislike a hadith (toggle, signed-in users only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReactionInput"
+      responses:
+        "200":
+          description: Current reaction state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReactToHadithPayload"
+
+  # ── User profiles ──────────────────────────────────────────────────────
+  /profile/me:
+    get:
+      operationId: getMyProfile
+      tags: [user-profiles]
+      summary: Get current user's profile (creates default on first access)
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+    patch:
+      operationId: updateMyProfile
+      tags: [user-profiles]
+      summary: Update current user's nickname and/or avatarUrl
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserProfileUpdate"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "429":
+          description: Nickname cooldown not expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
+
+  /profile/{clerkUserId}:
+    get:
+      operationId: getUserProfile
+      tags: [user-profiles]
+      summary: Get another user's public profile
+      parameters:
+        - name: clerkUserId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
+
+  # ── Admin avatar ───────────────────────────────────────────────────────
+  /admins/me/avatar:
+    patch:
+      operationId: updateMyAdminAvatar
+      tags: [admins]
+      summary: Update current admin's own avatarUrl
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminAvatarUpdate"
+      responses:
+        "200":
+          description: Updated admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminWithAvatar"
+
+  # ── Storage ────────────────────────────────────────────────────────────
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [storage]
+      summary: Request a presigned upload URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestUploadUrlInput"
+      responses:
+        "200":
+          description: Upload URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestUploadUrlPayload"
+
 components:
   schemas:
-    HealthStatus:
+    HealthCheckPayload:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    ErrorPayload:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    SuccessPayload:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+
+    # ── Admin / Me ─────────────────────────────────────────────────────
+    Admin:
+      type: object
+      required: [id, clerkUserId, email, name, role, createdAt]
+      properties:
+        id: { type: integer }
+        clerkUserId: { type: string }
+        email: { type: string }
+        name: { type: string }
+        avatarUrl: { type: ["string", "null"] }
+        role:
+          type: string
+          enum: [owner, editor]
+        createdAt: { type: string }
+
+    GetMePayload:
+      type: ["object", "null"]
+      properties:
+        id: { type: integer }
+        clerkUserId: { type: string }
+        email: { type: string }
+        name: { type: string }
+        avatarUrl: { type: ["string", "null"] }
+        role:
+          type: string
+          enum: [owner, editor]
+        createdAt: { type: string }
+
+    ListAdminsPayload:
+      type: array
+      items:
+        $ref: "#/components/schemas/Admin"
+
+    AdminInput:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string }
+        role:
+          type: string
+          enum: [owner, editor]
+
+    CreateAdminPayload:
+      $ref: "#/components/schemas/Admin"
+
+    AdminRoleUpdate:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [owner, editor]
+        transferOwnership:
+          type: boolean
+
+    ClerkUserSummary:
+      type: object
+      required: [id, firstName, lastName, email, banned, createdAt]
+      properties:
+        id: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string }
+        imageUrl: { type: ["string", "null"] }
+        banned: { type: boolean }
+        createdAt: { type: string }
+
+    # ── Content ────────────────────────────────────────────────────────
+    ContentItem:
+      type: object
+      required: [id, key, group, label, type, value, order, updatedAt]
+      properties:
+        id: { type: integer }
+        key: { type: string }
+        group: { type: string }
+        label: { type: string }
+        type:
+          type: string
+          enum: [text, textarea, url, color, image]
+        value: { type: string }
+        order: { type: integer }
+        updatedAt: { type: string }
+
+    ListContentPayload:
+      type: array
+      items:
+        $ref: "#/components/schemas/ContentItem"
+
+    ContentItemInput:
+      type: object
+      required: [key, value]
+      properties:
+        key: { type: string }
+        group: { type: string }
+        label: { type: string }
+        type:
+          type: string
+          enum: [text, textarea, url, color, image]
+        value: { type: string }
+        order: { type: integer }
+
+    UpsertContentInput:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentItemInput"
+
+    UpsertContentPayload:
+      type: array
+      items:
+        $ref: "#/components/schemas/ContentItem"
+
+    # ── Posts ──────────────────────────────────────────────────────────
+    PostAttachment:
+      type: object
+      required: [url, type]
+      properties:
+        url: { type: string }
+        type: { type: string, enum: [image, video, file] }
+        name: { type: string }
+
+    Post:
+      type: object
+      required: [id, title, slug, excerpt, content, published, authorName, attachments, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        slug: { type: string }
+        excerpt: { type: string }
+        content: { type: string }
+        coverImageUrl: { type: ["string", "null"] }
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostAttachment"
+        published: { type: boolean }
+        authorId: { type: ["integer", "null"] }
+        authorName: { type: string }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+
+    ListPostsPayload:
+      type: array
+      items:
+        $ref: "#/components/schemas/Post"
+
+    ListMyPostsPayload:
+      type: array
+      items:
+        $ref: "#/components/schemas/Post"
+
+    PostInput:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1 }
+        excerpt: { type: string }
+        content: { type: string }
+        coverImageUrl: { type: ["string", "null"] }
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostAttachment"
+        published: { type: boolean }
+
+    PostUpdate:
+      type: object
+      properties:
+        title: { type: string, minLength: 1 }
+        excerpt: { type: string }
+        content: { type: string }
+        coverImageUrl: { type: ["string", "null"] }
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostAttachment"
+        published: { type: boolean }
+
+    CreatePostPayload:
+      $ref: "#/components/schemas/Post"
+
+    GetPostBySlugPayload:
+      $ref: "#/components/schemas/Post"
+
+    UpdatePostPayload:
+      $ref: "#/components/schemas/Post"
+
+    # ── Post interactions ──────────────────────────────────────────────
+    PostComment:
+      type: object
+      required: [id, postId, authorName, isAdmin, content, createdAt]
+      properties:
+        id: { type: integer }
+        postId: { type: integer }
+        authorClerkId: { type: ["string", "null"] }
+        authorName: { type: string }
+        authorAvatarUrl: { type: ["string", "null"] }
+        isAdmin: { type: boolean }
+        content: { type: string }
+        createdAt: { type: string }
+
+    CommentInput:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string, minLength: 1 }
+
+    ReactionInput:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [like, dislike]
+
+    PostInteractions:
+      type: object
+      required: [comments, likes, dislikes, myReaction]
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostComment"
+        likes: { type: integer }
+        dislikes: { type: integer }
+        myReaction:
+          type: ["string", "null"]
+          enum: [like, dislike, null]
+
+    ReactToPostPayload:
+      type: object
+      required: [myReaction]
+      properties:
+        myReaction:
+          type: ["string", "null"]
+          enum: [like, dislike, null]
+
+    # ── Admin with avatar ──────────────────────────────────────────────
+    AdminWithAvatar:
+      type: object
+      required: [id, clerkUserId, email, name, role, createdAt]
+      properties:
+        id: { type: integer }
+        clerkUserId: { type: string }
+        email: { type: string }
+        name: { type: string }
+        role:
+          type: string
+          enum: [owner, editor]
+        avatarUrl: { type: ["string", "null"] }
+        createdAt: { type: string }
+
+    AdminAvatarUpdate:
+      type: object
+      properties:
+        avatarUrl: { type: ["string", "null"] }
+
+    # ── Hadiths ────────────────────────────────────────────────────────
+    HadithGrade:
+      type: string
+      enum: [sahih, hasan, daif, mawdu]
+
+    Hadith:
+      type: object
+      required: [id, text, source, narrator, grade, topic, published, authorName, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        text: { type: string }
+        source: { type: string }
+        narrator: { type: string }
+        grade:
+          $ref: "#/components/schemas/HadithGrade"
+        topic: { type: string }
+        published: { type: boolean }
+        authorId: { type: ["integer", "null"] }
+        authorName: { type: string }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+
+    ListHadithsPayload:
+      type: array
+      items:
+        $ref: "#/components/schemas/Hadith"
+
+    ListMyHadithsPayload:
+      type: array
+      items:
+        $ref: "#/components/schemas/Hadith"
+
+    HadithInput:
+      type: object
+      required: [text, grade]
+      properties:
+        text: { type: string, minLength: 1 }
+        source: { type: string }
+        narrator: { type: string }
+        grade:
+          $ref: "#/components/schemas/HadithGrade"
+        topic: { type: string }
+        published: { type: boolean }
+
+    HadithUpdate:
+      type: object
+      properties:
+        text: { type: string, minLength: 1 }
+        source: { type: string }
+        narrator: { type: string }
+        grade:
+          $ref: "#/components/schemas/HadithGrade"
+        topic: { type: string }
+        published: { type: boolean }
+
+    GetHadithPayload:
+      $ref: "#/components/schemas/Hadith"
+
+    CreateHadithPayload:
+      $ref: "#/components/schemas/Hadith"
+
+    UpdateHadithPayload:
+      $ref: "#/components/schemas/Hadith"
+
+    # ── Hadith interactions ────────────────────────────────────────────
+    HadithComment:
+      type: object
+      required: [id, hadithId, authorName, isAdmin, content, createdAt]
+      properties:
+        id: { type: integer }
+        hadithId: { type: integer }
+        authorClerkId: { type: ["string", "null"] }
+        authorName: { type: string }
+        authorAvatarUrl: { type: ["string", "null"] }
+        isAdmin: { type: boolean }
+        content: { type: string }
+        createdAt: { type: string }
+
+    HadithInteractions:
+      type: object
+      required: [comments, likes, dislikes, myReaction]
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/HadithComment"
+        likes: { type: integer }
+        dislikes: { type: integer }
+        myReaction:
+          type: ["string", "null"]
+          enum: [like, dislike, null]
+
+    ReactToHadithPayload:
+      type: object
+      required: [myReaction]
+      properties:
+        myReaction:
+          type: ["string", "null"]
+          enum: [like, dislike, null]
+
+    # ── User profiles ──────────────────────────────────────────────────
+    UserProfile:
+      type: object
+      required: [id, clerkUserId, nickname, nicknameUpdatedAt, createdAt]
+      properties:
+        id: { type: integer }
+        clerkUserId: { type: string }
+        nickname: { type: string }
+        avatarUrl: { type: ["string", "null"] }
+        nicknameUpdatedAt: { type: string }
+        createdAt: { type: string }
+
+    UserProfileUpdate:
+      type: object
+      properties:
+        nickname: { type: string, minLength: 1 }
+        avatarUrl: { type: ["string", "null"] }
+
+    # ── Messages ───────────────────────────────────────────────────────
+    Message:
+      type: object
+      required: [id, senderName, senderRole, content, isRead, createdAt]
+      properties:
+        id: { type: integer }
+        senderClerkId: { type: ["string", "null"] }
+        senderName: { type: string }
+        senderEmail: { type: ["string", "null"] }
+        senderRole: { type: string }
+        recipientClerkId: { type: ["string", "null"] }
+        subject: { type: ["string", "null"] }
+        content: { type: string }
+        isRead: { type: boolean }
+        parentId: { type: ["integer", "null"] }
+        createdAt: { type: string }
+
+    ListMessagesPayload:
+      type: array
+      items:
+        $ref: "#/components/schemas/Message"
+
+    MessageInput:
+      type: object
+      required: [senderName, content]
+      properties:
+        senderName: { type: string, minLength: 1 }
+        senderEmail: { type: string }
+        subject: { type: string }
+        content: { type: string, minLength: 1 }
+
+    SendMessagePayload:
+      $ref: "#/components/schemas/Message"
+
+    GetUnreadCountPayload:
+      type: object
+      required: [count]
+      properties:
+        count: { type: integer }
+
+    GetMessagePayload:
+      type: object
+      required: [message, replies]
+      properties:
+        message:
+          $ref: "#/components/schemas/Message"
+        replies:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+
+    MarkMessageReadPayload:
+      $ref: "#/components/schemas/Message"
+
+    ReplyInput:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string, minLength: 1 }
+
+    ReplyToMessagePayload:
+      $ref: "#/components/schemas/Message"
+
+    # ── Chat ───────────────────────────────────────────────────────────
+    ChatUser:
+      type: object
+      required: [id, clerkUserId, name, email, updatedAt, createdAt]
+      properties:
+        id: { type: integer }
+        clerkUserId: { type: string }
+        name: { type: string }
+        email: { type: string }
+        avatarUrl: { type: ["string", "null"] }
+        updatedAt: { type: string }
+        createdAt: { type: string }
+
+    ListChatUsersPayload:
+      type: array
+      items:
+        $ref: "#/components/schemas/ChatUser"
+
+    ConversationSummary:
+      type: object
+      required: [id, kind, title, lastMessageAt, lastMessagePreview, unread]
+      properties:
+        id: { type: integer }
+        kind:
+          type: string
+          enum: [support, direct]
+        title: { type: string }
+        otherAvatarUrl: { type: ["string", "null"] }
+        lastMessageAt: { type: string }
+        lastMessagePreview: { type: string }
+        unread: { type: boolean }
+
+    ListConversationsPayload:
+      type: array
+      items:
+        $ref: "#/components/schemas/ConversationSummary"
+
+    StartSupportConversationPayload:
+      type: object
+      required: [id]
+      properties:
+        id: { type: integer }
+
+    StartDirectConversationInput:
+      type: object
+      required: [targetClerkId]
+      properties:
+        targetClerkId: { type: string }
+
+    StartDirectConversationPayload:
+      type: object
+      required: [id]
+      properties:
+        id: { type: integer }
+
+    ChatMessage:
+      type: object
+      required: [id, conversationId, senderClerkId, senderName, senderIsAdmin, isDeleted, isForwarded, createdAt]
+      properties:
+        id: { type: integer }
+        conversationId: { type: integer }
+        senderClerkId: { type: string }
+        senderName: { type: string }
+        senderNickname: { type: ["string", "null"] }
+        senderAvatarUrl: { type: ["string", "null"] }
+        senderIsAdmin:
+          type: string
+          enum: ["true", "false"]
+        content: { type: ["string", "null"] }
+        attachmentUrl: { type: ["string", "null"] }
+        attachmentType:
+          type: ["string", "null"]
+          enum: [image, video, file, null]
+        attachmentName: { type: ["string", "null"] }
+        attachmentMimeType: { type: ["string", "null"] }
+        attachmentSize: { type: ["integer", "null"] }
+        isDeleted: { type: boolean }
+        isForwarded: { type: boolean }
+        forwardedFromSenderName: { type: ["string", "null"] }
+        createdAt: { type: string }
+
+    ListChatMessagesPayload:
+      type: array
+      items:
+        $ref: "#/components/schemas/ChatMessage"
+
+    ChatMessageInput:
+      type: object
+      properties:
+        content: { type: string }
+        attachmentUrl: { type: string }
+        attachmentType:
+          type: string
+          enum: [image, video, file]
+        attachmentName: { type: string }
+        attachmentMimeType: { type: string }
+        attachmentSize: { type: integer }
+
+    SendChatMessagePayload:
+      $ref: "#/components/schemas/ChatMessage"
+
+    ForwardChatMessageInput:
+      type: object
+      required: [targetConversationId]
+      properties:
+        targetConversationId: { type: integer }
+
+    # ── Storage ────────────────────────────────────────────────────────
+    RequestUploadUrlInput:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name: { type: string }
+        size: { type: integer }
+        contentType: { type: string }
+
+    RequestUploadUrlPayload:
+      type: object
+      required: [uploadURL, objectPath, metadata]
+      properties:
+        uploadURL: { type: string }
+        objectPath: { type: string }
+        metadata:
+          type: object
+          required: [name, size, contentType]
+          properties:
+            name: { type: string }
+            size: { type: integer }
+            contentType: { type: string }

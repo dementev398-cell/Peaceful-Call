@@ -1,45 +1,27 @@
-# [Project name]
+# Peaceful Call
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Исламская образовательная платформа: хадисы, статьи, чат между пользователями, личный кабинет и админ-панель.
 
-## Run & Operate
+## Структура проекта
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `artifacts/chat-hub` — основной веб-фронтенд (React + Vite), preview path `/`. Название "Peaceful Call" должно оставаться неизменным везде.
+- `artifacts/api-server` — backend на Express (маршруты: admins, chat, content, hadith-interactions, hadiths, messages, me, post-interactions, posts, storage).
+- `artifacts/mockup-sandbox` — Canvas/дизайн-песочница (служебный артефакт).
+- `lib/db` — схема Drizzle (Postgres): admins, chat, content, hadith-interactions, hadiths, messages, post-interactions, posts, user-profiles.
+- `lib/api-spec` — OpenAPI-спецификация (`openapi.yaml`), источник истины для контрактов.
+- `lib/api-zod`, `lib/api-client-react` — автогенерируемые пакеты (Zod-схемы и React Query хуки) через orval.
 
-## Stack
+## Аутентификация и хранилище
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Аутентификация — Clerk (whitelabel через Replit), прокси-миддлвар `clerkProxyMiddleware.ts`.
+- Файлы/изображения — Replit Object Storage (GCS), с fallback на generic S3-клиент (`OBJECT_STORAGE_PROVIDER=s3`), автоопределение окружения в `objectStorage.ts`. Это также даёт совместимость с деплоем на Render.
 
-## Where things live
+## Пользовательские предпочтения
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- Всегда отвечать пользователю на русском языке.
+- Название проекта "Peaceful Call" должно везде оставаться в оригинальном виде (не переводить).
+- Проект должен без ошибок собираться и работать при деплое на хостинг Render, в дополнение к Replit.
 
-## Architecture decisions
+## История
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
-
-## Product
-
-_Describe the high-level user-facing capabilities of this app once they exist._
-
-## User preferences
-
-_Populate as you build — explicit user instructions worth remembering across sessions._
-
-## Gotchas
-
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+Проект был восстановлен из полной резервной копии (zip-архив прежней, более развитой версии), загруженной пользователем, и заменил собой пустой шаблон воркспейса. После восстановления пользователь предоставил список из ~26 замечаний/багов на русском языке, которые нужно исправить (переводы, контраст кнопок, превью обложек постов, права супер-админа, каскадное удаление чатов при удалении пользователя, реалтайм лайки/комментарии, поиск в чате, адаптивность и т.д.) — см. историю чата для полного списка.
