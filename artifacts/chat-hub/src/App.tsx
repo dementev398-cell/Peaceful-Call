@@ -22,6 +22,15 @@ import { ArrowLeft } from 'lucide-react';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { NicknameGate } from '@/components/NicknameGate';
+import { setBaseUrl } from '@workspace/api-client-react';
+
+// Configure API base URL for cross-origin deployments (e.g. Render static site
+// calling a separate API service). Defaults to '' (relative paths) which works
+// when the frontend and API share the same origin.
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
+if (apiBaseUrl) {
+  setBaseUrl(apiBaseUrl);
+}
 
 const queryClient = new QueryClient();
 

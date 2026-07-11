@@ -1,0 +1,83 @@
+services:
+  # ---------------------------------------------------------------------------
+  # API — Node/Express backend
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: peaceful-call-api
+    runtime: node
+    region: frankfurt
+    plan: starter
+    buildCommand: >
+      corepack enable &&
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @workspace/api-server run build
+    startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
+    healthCheckPath: /api/healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      # CORS: comma-separated list of allowed origins (e.g. https://peaceful-call.onrender.com)
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      # Object storage — use 's3' on Render (no GCS sidecar available)
+      - key: OBJECT_STORAGE_PROVIDER
+        value: s3
+      - key: S3_REGION
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      # Optional: S3-compatible endpoint (leave unset for AWS S3)
+      # - key: S3_ENDPOINT
+      #   sync: false
+      - key: PUBLIC_OBJECT_SEARCH_PATHS
+        sync: false
+      - key: PRIVATE_OBJECT_DIR
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+
+  # ---------------------------------------------------------------------------
+  # Frontend — React/Vite static site
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: peaceful-call-web
+    runtime: static
+    region: frankfurt
+    buildCommand: >
+      corepack enable &&
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @workspace/chat-hub run build
+    staticPublishPath: artifacts/chat-hub/dist/public
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false
+      # Full URL of the API service (e.g. https://peaceful-call-api.onrender.com)
+      # Leave empty only if serving frontend and API from the same origin.
+      - key: VITE_API_BASE_URL
+        sync: false
+      # Optional: override the Clerk proxy URL if using a custom domain
+      # - key: VITE_CLERK_PROXY_URL
+      #   sync: false

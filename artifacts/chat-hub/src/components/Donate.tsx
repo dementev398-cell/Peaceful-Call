@@ -48,62 +48,69 @@ export function Donate() {
           </ScrollReveal>
 
           <ScrollReveal delay="100">
-            <div className="flex flex-col items-center relative z-10 gap-8">
-              {/* QR Code */}
-              <div className="bg-white p-4 rounded-3xl shadow-[0_0_40px_rgba(240,160,32,0.15)] border border-primary/20 relative group">
-                <div className="absolute inset-0 border-2 border-primary/50 rounded-3xl scale-105 opacity-0 group-hover:opacity-100 group-hover:scale-100 transition-all duration-500 pointer-events-none"></div>
-                <img
-                  src={qrImage}
-                  alt="Donation QR Code"
-                  className="w-48 h-48 md:w-64 md:h-64 object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
+            <div className="relative z-10 grid md:grid-cols-[auto_1fr] gap-10 md:gap-14 items-center">
+              {/* QR Code column */}
+              <div className="flex flex-col items-center gap-4 mx-auto md:mx-0">
+                <div className="bg-white p-4 rounded-3xl shadow-[0_0_40px_rgba(240,160,32,0.15)] border border-primary/20 relative group">
+                  <div className="absolute inset-0 border-2 border-primary/50 rounded-3xl scale-105 opacity-0 group-hover:opacity-100 group-hover:scale-100 transition-all duration-500 pointer-events-none"></div>
+                  <img
+                    src={qrImage}
+                    alt="Donation QR Code"
+                    className="w-44 h-44 md:w-52 md:h-52 object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+                <p className="text-[0.65rem] md:text-xs text-muted-foreground uppercase tracking-[0.15em] font-semibold text-center max-w-[12rem]">
+                  {t('support.scanHint')}
+                </p>
               </div>
 
-              <p className="text-xs md:text-sm text-muted-foreground uppercase tracking-[0.15em] font-semibold -mt-2">
-                {t('support.scanHint')}
-              </p>
+              {/* Divider — desktop only */}
+              <div className="hidden md:block absolute left-[15.5rem] top-1/2 -translate-y-1/2 h-40 w-px bg-gradient-to-b from-transparent via-primary/25 to-transparent" />
 
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="group flex items-center gap-3 bg-background/80 glass px-6 py-3 rounded-full border border-border/50 shadow-inner hover:border-primary/40 transition-all"
-              >
-                <span className="font-mono text-sm md:text-base font-semibold text-foreground tracking-widest drop-shadow-sm">
-                  {walletNote}
-                </span>
-                <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-primary">
-                  {copied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      {t('support.copied')}
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 transition-opacity" />
-                      {t('support.copyAddress')}
-                    </>
-                  )}
-                </span>
-              </button>
+              {/* Actions column */}
+              <div className="flex flex-col items-center md:items-start gap-5 text-center md:text-left">
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="group flex items-center gap-3 bg-background/80 glass px-6 py-3 rounded-full border border-border/50 shadow-inner hover:border-primary/40 transition-all w-full sm:w-auto justify-center md:justify-start"
+                >
+                  <span className="font-mono text-sm md:text-base font-semibold text-foreground tracking-widest drop-shadow-sm">
+                    {walletNote}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-primary shrink-0">
+                    {copied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        {t('support.copied')}
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 transition-opacity" />
+                        {t('support.copyAddress')}
+                      </>
+                    )}
+                  </span>
+                </button>
 
-              {/* Primary donation button */}
-              <a
-                href="https://new.donatepay.ru/@PeacefulCall"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-3 px-10 py-5 rounded-full bg-primary text-primary-foreground font-bold text-sm md:text-base uppercase tracking-widest hover:brightness-110 transition-all glow-gold shadow-[0_10px_30px_rgba(240,160,32,0.3)] hover:shadow-[0_15px_40px_rgba(240,160,32,0.4)]"
-              >
-                <Heart className="w-5 h-5 fill-primary-foreground/60" />
-                {t('support.button')}
-                <ExternalLink className="w-4 h-4 opacity-70" />
-              </a>
+                {/* Primary donation button */}
+                <a
+                  href="https://new.donatepay.ru/@PeacefulCall"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group w-full sm:w-auto inline-flex items-center justify-center gap-3 px-10 py-5 rounded-full bg-primary text-primary-foreground font-bold text-sm md:text-base uppercase tracking-widest hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] transition-all glow-gold shadow-[0_10px_30px_rgba(240,160,32,0.3)] hover:shadow-[0_15px_40px_rgba(240,160,32,0.4)]"
+                >
+                  <Heart className="w-5 h-5 fill-primary-foreground/60" />
+                  {t('support.button')}
+                  <ExternalLink className="w-4 h-4 opacity-70 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                </a>
 
-              <p className="text-xs text-primary/70 font-semibold uppercase tracking-[0.2em] text-center">
-                {t('support.accepted')}
-              </p>
+                <p className="text-xs text-primary/70 font-semibold uppercase tracking-[0.2em]">
+                  {t('support.accepted')}
+                </p>
+              </div>
             </div>
           </ScrollReveal>
         </div>

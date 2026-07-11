@@ -114,12 +114,20 @@ export function Navbar() {
                 <UserMenu />
               </>
             ) : (
-              <Link
-                href="/sign-in"
-                className="h-8 px-4 rounded-full border border-primary/50 text-primary text-xs font-bold tracking-widest uppercase hover:bg-primary hover:text-primary-foreground transition-all duration-300 inline-flex items-center"
-              >
-                {t('nav.signin')}
-              </Link>
+              <>
+                <Link
+                  href="/sign-in"
+                  className="h-8 px-4 rounded-full border border-primary/50 text-primary text-xs font-bold tracking-widest uppercase hover:bg-primary hover:text-primary-foreground transition-all duration-300 inline-flex items-center"
+                >
+                  {t('nav.signin')}
+                </Link>
+                <Link
+                  href="/sign-up"
+                  className="h-8 px-4 rounded-full bg-primary text-[hsl(224_24%_4%)] text-xs font-bold tracking-widest uppercase hover:brightness-110 hover:scale-[1.03] active:scale-[0.98] transition-all duration-300 inline-flex items-center glow-gold-sm shadow-sm shadow-primary/30"
+                >
+                  {t('nav.signup')}
+                </Link>
+              </>
             )}
           </div>
 
@@ -180,7 +188,7 @@ export function Navbar() {
                   <Link href="/sign-in" onClick={() => setMenuOpen(false)} className="w-full inline-flex items-center justify-center h-12 rounded-full border border-primary/50 text-primary text-sm font-bold tracking-widest uppercase hover:bg-primary/5">
                     {t('nav.signin')}
                   </Link>
-                  <Link href="/sign-up" onClick={() => setMenuOpen(false)} className="w-full inline-flex items-center justify-center h-12 rounded-full bg-primary text-primary-foreground text-sm font-bold tracking-widest uppercase shadow-lg shadow-primary/20">
+                  <Link href="/sign-up" onClick={() => setMenuOpen(false)} className="w-full inline-flex items-center justify-center h-12 rounded-full bg-primary text-[hsl(224_24%_4%)] text-sm font-bold tracking-widest uppercase glow-gold-sm shadow-lg shadow-primary/20 hover:brightness-110 transition-all">
                     {t('nav.signup')}
                   </Link>
                 </div>

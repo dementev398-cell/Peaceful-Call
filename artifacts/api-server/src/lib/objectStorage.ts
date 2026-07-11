@@ -25,41 +25,42 @@ import {
  * Determine which storage backend to use.
  *
  * Rules (first match wins):
- *  1. OBJECT_STORAGE_PROVIDER=replit  → Replit GCS sidecar
+ *  1. OBJECT_STORAGE_PROVIDER=gcs-sidecar (or legacy alias 'replit') → GCS sidecar
  *  2. OBJECT_STORAGE_PROVIDER=s3      → S3-compatible
- *  3. REPLIT_DEV_DOMAIN or REPL_ID present → Replit (auto-detect)
+ *  3. REPLIT_DEV_DOMAIN or REPL_ID present → GCS sidecar (auto-detect managed env)
  *  4. default → S3
  */
-function resolveProvider(): 'replit' | 's3' {
+function resolveProvider(): 'gcs-sidecar' | 's3' {
   const explicit = process.env.OBJECT_STORAGE_PROVIDER;
-  if (explicit === 'replit') return 'replit';
+  // Accept both the new name and the legacy alias for backward compatibility
+  if (explicit === 'gcs-sidecar' || explicit === 'replit') return 'gcs-sidecar';
   if (explicit === 's3') return 's3';
-  // Auto-detect Replit environment
-  if (process.env.REPLIT_DEV_DOMAIN || process.env.REPL_ID) return 'replit';
+  // Auto-detect managed sidecar environment
+  if (process.env.REPLIT_DEV_DOMAIN || process.env.REPL_ID) return 'gcs-sidecar';
   return 's3';
 }
 
 const PROVIDER = resolveProvider();
 
 // ---------------------------------------------------------------------------
-// Replit backend (GCS sidecar)
+// GCS sidecar backend
 // ---------------------------------------------------------------------------
 
-const REPLIT_SIDECAR_ENDPOINT = 'http://127.0.0.1:1106';
+const GCS_SIDECAR_ENDPOINT = 'http://127.0.0.1:1106';
 
-/** Lazily initialised only when the Replit provider is selected. */
-let _replitStorageClient: Storage | undefined;
+/** Lazily initialised only when the GCS sidecar provider is selected. */
+let _gcsSidecarClient: Storage | undefined;
 
-function getReplitStorageClient(): Storage {
-  if (!_replitStorageClient) {
-    _replitStorageClient = new Storage({
+function getGcsSidecarClient(): Storage {
+  if (!_gcsSidecarClient) {
+    _gcsSidecarClient = new Storage({
       credentials: {
         audience: 'replit',
         subject_token_type: 'access_token',
-        token_url: `${REPLIT_SIDECAR_ENDPOINT}/token`,
+        token_url: `${GCS_SIDECAR_ENDPOINT}/token`,
         type: 'external_account',
         credential_source: {
-          url: `${REPLIT_SIDECAR_ENDPOINT}/credential`,
+          url: `${GCS_SIDECAR_ENDPOINT}/credential`,
           format: {
             type: 'json',
             subject_token_field_name: 'access_token',
@@ -70,23 +71,23 @@ function getReplitStorageClient(): Storage {
       projectId: '',
     });
   }
-  return _replitStorageClient;
+  return _gcsSidecarClient;
 }
 
 /**
  * Kept as a named export for any code that directly imported
- * `objectStorageClient` (Replit path only).
+ * `objectStorageClient` (GCS sidecar path only).
  */
 export const objectStorageClient = new Proxy(
   {} as Storage,
   {
     get(_target, prop, receiver) {
-      return Reflect.get(getReplitStorageClient(), prop, receiver);
+      return Reflect.get(getGcsSidecarClient(), prop, receiver);
     },
   },
 );
 
-async function replitSignObjectURL({
+async function gcsSidecarSignObjectURL({
   bucketName,
   objectName,
   method,
@@ -104,7 +105,7 @@ async function replitSignObjectURL({
     expires_at: new Date(Date.now() + ttlSec * 1000).toISOString(),
   };
   const response = await fetch(
-    `${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`,
+    `${GCS_SIDECAR_ENDPOINT}/object-storage/signed-object-url`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -114,8 +115,8 @@ async function replitSignObjectURL({
   );
   if (!response.ok) {
     throw new Error(
-      `Failed to sign object URL, errorcode: ${response.status}, ` +
-        `make sure you're running on Replit`,
+      `Failed to sign object URL via GCS sidecar, errorcode: ${response.status}. ` +
+        `Make sure the GCS sidecar service is running and accessible.`,
     );
   }
   const { signed_url: signedURL } = (await response.json()) as {
@@ -259,11 +260,11 @@ export class ObjectNotFoundError extends Error {
 // ---------------------------------------------------------------------------
 
 /**
- * Unified storage service.  Public method signatures are identical to the
- * original Replit-only implementation so no callers need to change.
+ * Unified storage service. Public method signatures are identical regardless
+ * of the active provider (GCS sidecar or S3).
  *
- * In the "replit" provider path it delegates to the GCS sidecar exactly as
- * before.  In the "s3" provider path it uses S3ObjectFile objects which have
+ * In the "gcs-sidecar" provider path it delegates to the GCS sidecar.
+ * In the "s3" provider path it uses S3ObjectFile objects which have
  * the same `.name` property used by callers.
  */
 export class ObjectStorageService {
@@ -314,11 +315,11 @@ export class ObjectStorageService {
       return null;
     }
 
-    // Replit path (unchanged)
+    // GCS sidecar path
     for (const searchPath of this.getPublicObjectSearchPaths()) {
       const fullPath = `${searchPath}/${filePath}`;
       const { bucketName, objectName } = parseObjectPath(fullPath);
-      const bucket = getReplitStorageClient().bucket(bucketName);
+      const bucket = getGcsSidecarClient().bucket(bucketName);
       const file = bucket.file(objectName);
       const [exists] = await file.exists();
       if (exists) return file;
@@ -336,7 +337,7 @@ export class ObjectStorageService {
       return s3DownloadObject(file, cacheTtlSec);
     }
 
-    // Replit GCS path (unchanged)
+    // GCS sidecar path
     const [metadata] = await (file as File).getMetadata();
     const aclPolicy = await getObjectAclPolicy(file as File);
     const isPublic = aclPolicy?.visibility === 'public';
@@ -368,10 +369,10 @@ export class ObjectStorageService {
       return s3GetSignedUrl(file, 'PUT', 900);
     }
 
-    // Replit path (unchanged)
+    // GCS sidecar path
     const fullPath = `${privateObjectDir}/uploads/${objectId}`;
     const { bucketName, objectName } = parseObjectPath(fullPath);
-    return replitSignObjectURL({ bucketName, objectName, method: 'PUT', ttlSec: 900 });
+    return gcsSidecarSignObjectURL({ bucketName, objectName, method: 'PUT', ttlSec: 900 });
   }
 
   // --- Entity file lookup -------------------------------------------------
@@ -398,10 +399,10 @@ export class ObjectStorageService {
       return file;
     }
 
-    // Replit path (unchanged)
+    // GCS sidecar path
     const objectEntityPath = `${entityDir}${entityId}`;
     const { bucketName, objectName } = parseObjectPath(objectEntityPath);
-    const bucket = getReplitStorageClient().bucket(bucketName);
+    const bucket = getGcsSidecarClient().bucket(bucketName);
     const objectFile = bucket.file(objectName);
     const [exists] = await objectFile.exists();
     if (!exists) throw new ObjectNotFoundError();
@@ -438,7 +439,7 @@ export class ObjectStorageService {
       }
     }
 
-    // Replit path (unchanged)
+    // GCS sidecar path
     if (!rawPath.startsWith('https://storage.googleapis.com/')) {
       return rawPath;
     }

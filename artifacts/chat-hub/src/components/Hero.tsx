@@ -1,7 +1,6 @@
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Link } from 'wouter';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { useUser } from '@clerk/react';
 import { Heart, ArrowRight, Sparkles, ArrowLeft } from 'lucide-react';
 import { useMemo, useRef } from 'react';
 
@@ -9,7 +8,6 @@ const PARTICLE_COUNT = 14;
 
 export function Hero() {
   const { t, isRtl } = useLanguage();
-  const { isSignedIn } = useUser();
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Precompute stable particle geometry once so re-renders (language switch,
@@ -216,15 +214,6 @@ export function Hero() {
                 <ArrowRight className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
               )}
             </Link>
-
-            {!isSignedIn && (
-              <Link 
-                href="/sign-up" 
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full border-2 border-primary/30 bg-background/60 backdrop-blur-md text-foreground font-bold text-sm uppercase tracking-widest hover:border-primary hover:bg-primary/10 transition-all duration-300 shadow-lg"
-              >
-                {t('nav.signup')}
-              </Link>
-            )}
 
             <a
               href="https://new.donatepay.ru/@PeacefulCall"
