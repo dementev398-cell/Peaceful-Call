@@ -1,0 +1,26 @@
+2026-07-11T18:53:06.455459842Z ==> Downloading cache...
+2026-07-11T18:53:06.493012347Z ==> Cloning from https://github.com/dementev398-cell/Peaceful-Call
+2026-07-11T18:53:07.056028019Z ==> Checking out commit f544e2ba4848ced1ea932409fc47bd64d2c68086 in branch main
+2026-07-11T18:53:14.110403602Z ==> Downloaded 98MB in 2s. Extraction took 6s.
+2026-07-11T18:53:16.149435723Z ==> Using Node.js version 24.14.1 (default)
+2026-07-11T18:53:16.149462934Z ==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+2026-07-11T18:53:16.22714577Z ==> Running build command 'pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server --filter @workspace/chat-hub run build'...
+2026-07-11T18:53:24.662700685Z ==> Uploading build...
+2026-07-11T18:53:32.665930457Z ==> Uploaded in 3.6s. Compression took 4.4s
+2026-07-11T18:53:32.692608536Z ==> Build successful 🎉
+2026-07-11T18:53:38.512348198Z ==> Deploying...
+2026-07-11T18:53:38.578780086Z ==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
+2026-07-11T18:53:58.889631466Z ==> Running 'NODE_ENV=production node --enable-source-maps artifacts/api-server/dist/index.mjs'
+2026-07-11T18:54:03.791012833Z /opt/render/project/src/lib/db/src/index.ts:8
+2026-07-11T18:54:03.791051875Z   throw new Error(
+2026-07-11T18:54:03.791055405Z         ^
+2026-07-11T18:54:03.791058005Z 
+2026-07-11T18:54:03.791062836Z Error: DATABASE_URL must be set. Did you forget to provision a database?
+2026-07-11T18:54:03.791066056Z     at <anonymous> (/opt/render/project/src/lib/db/src/index.ts:8:9)
+2026-07-11T18:54:03.791068966Z     at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+2026-07-11T18:54:03.791074016Z     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+2026-07-11T18:54:03.791077167Z     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+2026-07-11T18:54:03.791079927Z 
+2026-07-11T18:54:03.791082797Z Node.js v24.14.1
+2026-07-11T18:54:08.087821756Z ==> Exited with status 1
+2026-07-11T18:54:08.090593665Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
