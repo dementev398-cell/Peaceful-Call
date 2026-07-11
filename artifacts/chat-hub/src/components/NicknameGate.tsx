@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useGetMyProfile, useUpdateMyProfile, useGetMe } from '@workspace/api-client-react';
 import { useUser } from '@clerk/react';
+import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
 import { Loader2, User, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -23,9 +24,14 @@ export function NicknameGate({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const { t, isRtl } = useLanguage();
   const [nickname, setNickname] = useState('');
+  const [location] = useLocation();
+
+  // Never show the overlay on /profile — the user is already there to set up
+  // their profile, and the overlay fighting with ProfilePage is confusing.
+  const isOnProfilePage = location === '/profile';
 
   // While loading, show children to avoid flash
-  if (!clerkLoaded || !isSignedIn || adminLoading || profileLoading) {
+  if (!clerkLoaded || !isSignedIn || adminLoading || profileLoading || isOnProfilePage) {
     return <>{children}</>;
   }
 

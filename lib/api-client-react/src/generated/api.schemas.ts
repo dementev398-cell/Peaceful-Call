@@ -149,6 +149,43 @@ export interface UpsertContentInput {
 
 export type UpsertContentPayload = ContentItem[];
 
+export interface FaqItem {
+  id: number;
+  question: string;
+  answer: string;
+  order: number;
+  createdAt: string;
+}
+
+export type ListFaqPayload = FaqItem[];
+
+export interface FaqInput {
+  /** @minLength 1 */
+  question: string;
+  /** @minLength 1 */
+  answer: string;
+  order?: number;
+}
+
+export interface FaqUpdate {
+  /** @minLength 1 */
+  question?: string;
+  /** @minLength 1 */
+  answer?: string;
+  order?: number;
+}
+
+export interface AdminStatsPayload {
+  posts: number;
+  hadiths: number;
+  admins: number;
+  users: number;
+  conversations: number;
+  faq: number;
+  messages: number;
+  unreadMessages: number;
+}
+
 export type PostAttachmentType = typeof PostAttachmentType[keyof typeof PostAttachmentType];
 
 
@@ -562,20 +599,11 @@ export interface ChatMessage {
   attachmentSize?: number | null;
   isDeleted: boolean;
   isEdited?: boolean;
-  /** @nullable */
-  editedAt?: string | null;
   isForwarded: boolean;
   /** @nullable */
   forwardedFromSenderName?: string | null;
   createdAt: string;
 }
-
-export interface EditChatMessageInput {
-  /** @minLength 1 */
-  content: string;
-}
-
-export type EditChatMessagePayload = ChatMessage;
 
 export type ListChatMessagesPayload = ChatMessage[];
 
@@ -601,6 +629,10 @@ export type SendChatMessagePayload = ChatMessage;
 
 export interface ForwardChatMessageInput {
   targetConversationId: number;
+}
+
+export interface EditChatMessageInput {
+  content: string;
 }
 
 export interface RequestUploadUrlInput {

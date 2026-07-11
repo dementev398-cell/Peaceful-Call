@@ -37,8 +37,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useSearch } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useToast } from "@/hooks/use-toast";
 
 // Super-admin: fetch any user's conversations via custom API call
 async function fetchAdminUserConversations(clerkUserId: string) {
@@ -132,7 +139,7 @@ export default function MessagesPage() {
   return (
     <PageTransition className="min-h-screen flex flex-col bg-background">
       <Navbar />
-      <main className="flex-grow container mx-auto px-4 py-24 sm:py-28 max-w-7xl">
+      <main className="flex-grow container mx-auto px-2 sm:px-4 py-20 sm:py-28 max-w-7xl">
         <ScrollReveal>
           <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4" dir="ltr">
             <div>
@@ -157,10 +164,10 @@ export default function MessagesPage() {
 
         {adminViewClerkId ? (
           // Super-admin view: another user's chats
-          <div className="bg-card/40 glass border border-amber-500/40 rounded-[2rem] overflow-hidden h-[calc(100vh-280px)] min-h-[600px] flex shadow-2xl">
+          <div className="bg-card/40 glass border border-amber-500/40 rounded-2xl sm:rounded-[2rem] overflow-hidden h-[calc(100vh-160px)] sm:h-[calc(100vh-280px)] min-h-[480px] sm:min-h-[600px] flex shadow-2xl">
             <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500/60 rounded-full" />
             {/* Sidebar */}
-            <div className={`${adminViewConvId ? 'hidden md:flex' : 'flex'} w-full md:w-80 lg:w-96 flex-col border-r border-border/40 bg-amber-500/5`}>
+            <div className={`${adminViewConvId ? 'hidden md:flex' : 'flex'} w-full md:w-80 lg:w-96 flex-col border-r border-border/40 bg-amber-500/5 min-w-0`}>
               <div className="p-4 border-b border-border/40 bg-amber-500/10">
                 <div className="flex items-center gap-2 text-amber-600 font-semibold text-sm mb-1">
                   <Eye className="w-4 h-4" /> Режим просмотра (super-admin)
@@ -205,7 +212,7 @@ export default function MessagesPage() {
               </div>
             </div>
             {/* Chat Area (read-only) */}
-            <div className={`${!adminViewConvId ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-background relative`}>
+            <div className={`${!adminViewConvId ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-background relative min-w-0`}>
               {adminViewConvId ? (
                 <AdminReadonlyChatThread
                   conversationId={adminViewConvId}
@@ -222,14 +229,14 @@ export default function MessagesPage() {
           </div>
         ) : (
           // Normal user view
-          <div className="bg-card/40 glass border border-border/40 rounded-[2rem] overflow-hidden h-[calc(100vh-280px)] min-h-[600px] flex shadow-2xl">
+          <div className="bg-card/40 glass border border-border/40 rounded-2xl sm:rounded-[2rem] overflow-hidden h-[calc(100vh-160px)] sm:h-[calc(100vh-280px)] min-h-[480px] sm:min-h-[600px] flex shadow-2xl">
             {/* Sidebar */}
-            <div className={`${activeConvId ? 'hidden md:flex' : 'flex'} w-full md:w-80 lg:w-96 flex-col border-r border-border/40 bg-muted/10`}>
-              <div className="p-5 border-b border-border/40">
+            <div className={`${activeConvId ? 'hidden md:flex' : 'flex'} w-full md:w-80 lg:w-96 flex-col border-r border-border/40 bg-muted/10 min-w-0`}>
+              <div className="p-3 sm:p-5 border-b border-border/40">
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    placeholder="Поиск по имени или email..."
+                    placeholder={t('messages.search')}
                     value={convSearch}
                     onChange={e => setConvSearch(e.target.value)}
                     className="pl-10 bg-background/50 border-border/40 rounded-full h-11"
@@ -243,7 +250,7 @@ export default function MessagesPage() {
                 ) : filteredConversations.length === 0 ? (
                   <div className="text-center py-10 px-4 text-muted-foreground text-sm">
                     <MessageCircle className="w-8 h-8 mx-auto mb-3 opacity-20" />
-                    {convSearch ? 'Беседы не найдены' : 'У вас пока нет активных диалогов'}
+                    {convSearch ? t('messages.noUsers') : t('messages.noConvs')}
                   </div>
                 ) : (
                   filteredConversations.map(conv => (
@@ -266,14 +273,14 @@ export default function MessagesPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-baseline mb-1">
                           <span className="font-bold text-sm truncate pr-2 text-foreground">
-                            {conv.kind === 'support' ? 'Администрация' : conv.title}
+                            {conv.kind === 'support' ? t('messages.admin') : conv.title}
                           </span>
                           <span className="text-[10px] text-muted-foreground flex-shrink-0">
                             {parseApiDate(conv.lastMessageAt).toLocaleDateString()}
                           </span>
                         </div>
                         <p className={`text-xs truncate ${conv.unread ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}>
-                          {conv.lastMessagePreview || 'Нет сообщений'}
+                          {conv.lastMessagePreview || t('messages.noMessages')}
                         </p>
                       </div>
                     </button>
@@ -283,7 +290,7 @@ export default function MessagesPage() {
             </div>
 
             {/* Chat Area */}
-            <div className={`${!activeConvId ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-background relative`}>
+            <div className={`${!activeConvId ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-background relative min-w-0`}>
               {activeConvId ? (
                 <ChatThread conversationId={activeConvId} onBack={() => setActiveConvId(null)} />
               ) : (
@@ -291,7 +298,7 @@ export default function MessagesPage() {
                   <div className="w-24 h-24 rounded-full bg-muted/50 flex items-center justify-center mb-6">
                     <MessageCircle className="w-10 h-10 text-muted-foreground/30" />
                   </div>
-                  <p className="font-serif text-xl">Выберите беседу для начала общения</p>
+                  <p className="font-serif text-xl text-center">{t('messages.selectConv')}</p>
                 </div>
               )}
             </div>
@@ -315,26 +322,25 @@ function DeleteConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useLanguage();
   return (
-    <AlertDialog open={open}>
+    <AlertDialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {scope === 'everyone' ? 'Удалить у всех?' : 'Удалить у себя?'}
+            {scope === 'everyone' ? t('messages.deleteEveryoneTitle') : t('messages.deleteMeTitle')}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {scope === 'everyone'
-              ? 'Сообщение будет удалено для всех участников беседы. Это действие необратимо.'
-              : 'Сообщение будет скрыто только для вас. Собеседник по-прежнему его увидит.'}
+            {scope === 'everyone' ? t('messages.deleteEveryoneDesc') : t('messages.deleteMeDesc')}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onCancel}>Отмена</AlertDialogCancel>
+          <AlertDialogCancel onClick={onCancel}>{t('messages.editCancel')}</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
             className={scope === 'everyone' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
           >
-            Удалить
+            {t('messages.confirmDelete')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -352,22 +358,23 @@ function MessageBubble({
   msg,
   isMe,
   showAvatar,
-  conversationId,
   onOptimisticDelete,
   onOptimisticEdit,
+  onRefetch,
 }: {
   msg: ChatMessage;
   isMe: boolean;
   showAvatar: boolean;
-  conversationId: number;
   onOptimisticDelete: (id: number, scope: 'me' | 'everyone') => void;
   onOptimisticEdit: (id: number, content: string) => void;
+  onRefetch: () => void;
 }) {
+  const { t } = useLanguage();
+  const { toast } = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [editContent, setEditContent] = useState(msg.content ?? '');
-  const menuRef = useRef<HTMLDivElement>(null);
   const editRef = useRef<HTMLTextAreaElement>(null);
 
   const deleteMessage = useDeleteChatMessage();
@@ -378,18 +385,6 @@ function MessageBubble({
   const canDeleteForEveryone = isMe && !msg.isDeleted;
   // Can always delete for me (hide) if not already deleted globally
   const canDeleteForMe = !msg.isDeleted;
-
-  // Close menu on outside click
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [menuOpen]);
 
   // Focus edit area when entering edit mode
   useEffect(() => {
@@ -404,7 +399,12 @@ function MessageBubble({
     const { messageId, scope } = pendingDelete;
     // Optimistic update
     onOptimisticDelete(messageId, scope);
-    deleteMessage.mutate({ id: messageId, params: { scope } });
+    deleteMessage.mutate({ id: messageId, params: { scope } }, {
+      onError: () => {
+        onRefetch();
+        toast({ title: t('nickname.error'), description: t('messages.deleteFailed'), variant: 'destructive' });
+      },
+    });
     setPendingDelete(null);
     setMenuOpen(false);
   };
@@ -416,7 +416,12 @@ function MessageBubble({
       return;
     }
     onOptimisticEdit(msg.id, trimmed);
-    editMessage.mutate({ id: msg.id, data: { content: trimmed } });
+    editMessage.mutate({ id: msg.id, data: { content: trimmed } }, {
+      onError: () => {
+        onRefetch();
+        toast({ title: t('nickname.error'), description: t('messages.editFailed'), variant: 'destructive' });
+      },
+    });
     setEditMode(false);
   };
 
@@ -436,11 +441,11 @@ function MessageBubble({
         onCancel={() => setPendingDelete(null)}
       />
 
-      <div className={`flex gap-3 max-w-[85%] ${isMe ? 'self-end flex-row-reverse' : 'self-start'}`}>
+      <div className={`flex gap-2 sm:gap-3 max-w-[88%] sm:max-w-[85%] min-w-0 ${isMe ? 'self-end flex-row-reverse' : 'self-start'}`}>
         {!isMe && (
-          <div className="w-8 shrink-0">
+          <div className="w-7 sm:w-8 shrink-0">
             {showAvatar && (
-              <Avatar className="w-8 h-8">
+              <Avatar className="w-7 h-7 sm:w-8 sm:h-8">
                 <AvatarImage src={msg.senderAvatarUrl || ''} />
                 <AvatarFallback className="text-[10px]">{msg.senderName.charAt(0)}</AvatarFallback>
               </Avatar>
@@ -448,69 +453,88 @@ function MessageBubble({
           </div>
         )}
 
-        <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+        <div className={`flex flex-col min-w-0 ${isMe ? 'items-end' : 'items-start'}`}>
           {showAvatar && (
-            <span className="text-xs text-muted-foreground mb-1 ml-1 font-medium flex items-center gap-1">
-              {msg.senderName}
+            <span className="text-xs text-muted-foreground mb-1 ml-1 font-medium flex items-center gap-1 max-w-full truncate">
+              <span className="truncate">{msg.senderName}</span>
               {msg.senderIsAdmin === 'true' && (
-                <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider">Админ</span>
+                <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider shrink-0">{t('messages.admin')}</span>
               )}
             </span>
           )}
 
-          {/* Message bubble + hover/tap actions */}
+          {/* Message bubble + tap/hover actions */}
           <div
-            ref={menuRef}
             className={`relative group flex items-center gap-1 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
           >
-            {/* Desktop: fade-in action button on hover */}
-            {showActionsMenu && (
-              <div
-                className={`
-                  shrink-0 flex items-center
-                  opacity-0 group-hover:opacity-100 transition-opacity
-                  ${isMe ? 'mr-1' : 'ml-1'}
-                `}
-              >
-                <button
-                  onClick={() => setMenuOpen(v => !v)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Действия с сообщением"
+            {/* Single actions trigger. On desktop it fades in on hover; on
+                touch it stays visible so it is tappable. Exactly one trigger. */}
+            {showActionsMenu && !editMode && (
+              <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={`
+                      shrink-0 flex items-center justify-center rounded-full
+                      w-9 h-9 text-muted-foreground transition-all
+                      hover:bg-muted hover:text-foreground
+                      opacity-100 sm:opacity-0 sm:group-hover:opacity-100
+                      data-[state=open]:opacity-100 data-[state=open]:bg-muted
+                      ${isMe ? 'mr-1' : 'ml-1'}
+                    `}
+                    aria-label={t('messages.messageActions')}
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align={isMe ? 'end' : 'start'}
+                  side="top"
+                  sideOffset={6}
+                  collisionPadding={12}
+                  avoidCollisions
+                  className="min-w-[180px] rounded-xl z-[60]"
                 >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-
-            {/* Mobile: always-visible tap target (small dot), only shown on touch */}
-            {showActionsMenu && (
-              <div
-                className={`
-                  shrink-0 flex items-center
-                  sm:hidden
-                  ${isMe ? 'mr-1' : 'ml-1'}
-                `}
-              >
-                <button
-                  onClick={() => setMenuOpen(v => !v)}
-                  className="w-10 h-10 flex items-center justify-center rounded-full active:bg-muted text-muted-foreground transition-colors"
-                  aria-label="Действия с сообщением"
-                >
-                  <MoreHorizontal className="w-5 h-5" />
-                </button>
-              </div>
+                  {canEdit && (
+                    <DropdownMenuItem
+                      onSelect={() => { setEditMode(true); }}
+                      className="gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer"
+                    >
+                      <Pencil className="w-4 h-4 text-muted-foreground shrink-0" />
+                      {t('messages.edit')}
+                    </DropdownMenuItem>
+                  )}
+                  {canDeleteForEveryone && (
+                    <DropdownMenuItem
+                      onSelect={() => setPendingDelete({ messageId: msg.id, scope: 'everyone' })}
+                      className="gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                    >
+                      <Trash2 className="w-4 h-4 shrink-0" />
+                      {t('messages.deleteForEveryone')}
+                    </DropdownMenuItem>
+                  )}
+                  {canDeleteForMe && (
+                    <DropdownMenuItem
+                      onSelect={() => setPendingDelete({ messageId: msg.id, scope: 'me' })}
+                      className="gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer text-muted-foreground"
+                    >
+                      <Trash2 className="w-4 h-4 shrink-0 opacity-70" />
+                      {t('messages.deleteForMe')}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
 
             {/* Bubble */}
-            <div className={`rounded-2xl px-4 py-2.5 ${
+            <div className={`rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 min-w-0 max-w-full overflow-hidden ${
               isMe
                 ? 'bg-primary text-primary-foreground rounded-tr-sm'
                 : 'bg-muted rounded-tl-sm border border-border/50 text-foreground'
             }`}>
               {msg.isDeleted ? (
-                <p className="text-sm italic opacity-60">Сообщение удалено</p>
+                <p className="text-sm italic opacity-60">{t('messages.deleted')}</p>
               ) : editMode ? (
-                <div className="flex flex-col gap-2 min-w-[180px]">
+                <div className="flex flex-col gap-2 min-w-[180px] max-w-full">
                   <textarea
                     ref={editRef}
                     value={editContent}
@@ -527,7 +551,7 @@ function MessageBubble({
                       onClick={handleEditCancel}
                       className="text-[11px] px-2 py-1 rounded opacity-70 hover:opacity-100 transition-opacity"
                     >
-                      Отмена
+                      {t('messages.editCancel')}
                     </button>
                     <button
                       onClick={handleEditSave}
@@ -535,18 +559,18 @@ function MessageBubble({
                       className="text-[11px] px-2 py-1 rounded bg-white/20 hover:bg-white/30 transition-colors flex items-center gap-1"
                     >
                       {editMessage.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                      Сохранить
+                      {t('messages.editSave')}
                     </button>
                   </div>
                 </div>
               ) : (
                 <>
-                  {msg.content && <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>}
+                  {msg.content && <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>}
                   {msg.attachmentUrl && (
                     <AttachmentPreview
                       url={`${import.meta.env.BASE_URL}api/storage${msg.attachmentUrl}`}
                       type={msg.attachmentType}
-                      name={msg.attachmentName || 'Файл'}
+                      name={msg.attachmentName || t('messages.file')}
                       size={msg.attachmentSize ?? null}
                       isMe={isMe}
                     />
@@ -554,49 +578,11 @@ function MessageBubble({
                 </>
               )}
             </div>
-
-            {/* Dropdown actions menu */}
-            {menuOpen && (
-              <div
-                className={`
-                  absolute z-30 top-full mt-1 bg-popover border border-border rounded-xl shadow-lg py-1 min-w-[180px]
-                  ${isMe ? 'right-10' : 'left-10'}
-                `}
-              >
-                {canEdit && (
-                  <button
-                    onClick={() => { setEditMode(true); setMenuOpen(false); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors text-left"
-                  >
-                    <Pencil className="w-4 h-4 text-muted-foreground shrink-0" />
-                    Редактировать
-                  </button>
-                )}
-                {canDeleteForEveryone && (
-                  <button
-                    onClick={() => { setPendingDelete({ messageId: msg.id, scope: 'everyone' }); setMenuOpen(false); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors text-left"
-                  >
-                    <Trash2 className="w-4 h-4 shrink-0" />
-                    Удалить у всех
-                  </button>
-                )}
-                {canDeleteForMe && (
-                  <button
-                    onClick={() => { setPendingDelete({ messageId: msg.id, scope: 'me' }); setMenuOpen(false); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted transition-colors text-left"
-                  >
-                    <Trash2 className="w-4 h-4 shrink-0 opacity-70" />
-                    Удалить у себя
-                  </button>
-                )}
-              </div>
-            )}
           </div>
 
           <div className="flex items-center gap-1 mt-1">
             {msg.isEdited && !msg.isDeleted && (
-              <span className="text-[10px] text-muted-foreground opacity-60 italic">(изменено)</span>
+              <span className="text-[10px] text-muted-foreground opacity-60 italic">{t('messages.edited')}</span>
             )}
             <span className="text-[10px] text-muted-foreground opacity-60">
               {parseApiDate(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -609,6 +595,8 @@ function MessageBubble({
 }
 
 function ChatThread({ conversationId, onBack }: { conversationId: number, onBack: () => void }) {
+  const { t } = useLanguage();
+  const { toast } = useToast();
   const { user } = useUser();
   const queryClient = useQueryClient();
   const [content, setContent] = useState('');
@@ -669,9 +657,10 @@ function ChatThread({ conversationId, onBack }: { conversationId: number, onBack
       const { uploadURL, objectPath } = await requestUploadUrl.mutateAsync({
         data: { name: file.name, size: file.size, contentType: file.type }
       });
-      await fetch(uploadURL, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
+      const putRes = await fetch(uploadURL, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
+      if (!putRes.ok) throw new Error('Upload PUT failed');
       const attachmentType = getAttachmentType(file.type);
-      sendMessage.mutate({
+      await sendMessage.mutateAsync({
         id: conversationId,
         data: {
           content: content.trim() || undefined,
@@ -681,16 +670,14 @@ function ChatThread({ conversationId, onBack }: { conversationId: number, onBack
           attachmentMimeType: file.type,
           attachmentSize: file.size
         }
-      }, {
-        onSuccess: () => {
-          setContent('');
-          setPendingUpload(null);
-          scrollToBottom();
-          invalidateMessages();
-        }
       });
+      setContent('');
+      setPendingUpload(null);
+      scrollToBottom();
+      invalidateMessages();
     } catch (e) {
       console.error('Upload failed', e);
+      toast({ title: t('nickname.error'), description: t('messages.uploadFailed'), variant: 'destructive' });
     } finally {
       setIsUploading(false);
     }
@@ -710,18 +697,25 @@ function ChatThread({ conversationId, onBack }: { conversationId: number, onBack
 
   const handleSend = () => {
     if (!content.trim() && !pendingUpload) return;
-    
+    if (isUploading || sendMessage.isPending) return;
+
     if (pendingUpload) {
       void uploadFile(pendingUpload);
     } else {
+      const text = content.trim();
       sendMessage.mutate({
         id: conversationId,
-        data: { content: content.trim() }
+        data: { content: text }
       }, {
         onSuccess: () => {
           setContent('');
           scrollToBottom();
           invalidateMessages();
+        },
+        onError: () => {
+          // Keep the user's text so it isn't lost; surface a translated error.
+          setContent(text);
+          toast({ title: t('nickname.error'), description: t('messages.sendFailed'), variant: 'destructive' });
         }
       });
     }
@@ -729,18 +723,22 @@ function ChatThread({ conversationId, onBack }: { conversationId: number, onBack
 
   return (
     <div className="flex flex-col h-full">
-      <div className="h-16 px-4 md:px-6 border-b border-border/50 flex items-center gap-4 bg-card/50 backdrop-blur">
-        <button onClick={onBack} className="md:hidden p-2 -ml-2 text-muted-foreground hover:text-foreground">
-          <X className="w-5 h-5" />
+      <div className="h-14 sm:h-16 px-3 sm:px-6 border-b border-border/50 flex items-center gap-2 sm:gap-4 bg-card/50 backdrop-blur shrink-0">
+        <button
+          onClick={onBack}
+          className="md:hidden p-2 -ml-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          aria-label={t('messages.back')}
+        >
+          <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="font-bold font-serif text-lg">Чат</div>
+        <div className="font-bold font-serif text-base sm:text-lg truncate">{t('messages.chat')}</div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-6" ref={scrollRef}>
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-6" ref={scrollRef}>
         {isLoading ? (
           <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
         ) : (
-          <div className="space-y-6 flex flex-col justify-end min-h-full">
+          <div className="space-y-4 sm:space-y-6 flex flex-col justify-end min-h-full">
             {messages.map((msg, i) => {
               const isMe = msg.senderClerkId === user?.id;
               const showAvatar = !isMe && (i === 0 || messages[i-1].senderClerkId !== msg.senderClerkId);
@@ -751,9 +749,9 @@ function ChatThread({ conversationId, onBack }: { conversationId: number, onBack
                   msg={msg}
                   isMe={isMe}
                   showAvatar={showAvatar}
-                  conversationId={conversationId}
                   onOptimisticDelete={handleOptimisticDelete}
                   onOptimisticEdit={handleOptimisticEdit}
+                  onRefetch={invalidateMessages}
                 />
               );
             })}
@@ -762,29 +760,29 @@ function ChatThread({ conversationId, onBack }: { conversationId: number, onBack
       </div>
 
       {pendingUpload && (
-        <div className="px-6 py-3 bg-muted/30 border-t border-border/50 flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="px-3 sm:px-6 py-3 bg-muted/30 border-t border-border/50 flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="w-10 h-10 rounded bg-background border border-border flex items-center justify-center shrink-0">
               <Paperclip className="w-4 h-4 text-muted-foreground" />
             </div>
-            <div className="truncate">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-medium truncate">{pendingUpload.name}</p>
               <p className="text-xs text-muted-foreground">{(pendingUpload.size / 1024 / 1024).toFixed(2)} MB</p>
             </div>
           </div>
-          <button onClick={() => setPendingUpload(null)} className="p-2 text-muted-foreground hover:text-destructive shrink-0">
+          <button onClick={() => setPendingUpload(null)} className="p-2 text-muted-foreground hover:text-destructive shrink-0" aria-label={t('messages.editCancel')}>
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      <div className="p-4 bg-card border-t border-border/50">
+      <div className="p-3 sm:p-4 bg-card border-t border-border/50 shrink-0">
         <div className="flex items-end gap-2 bg-background border border-border rounded-3xl p-2 pl-4 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 transition-all">
           <Textarea 
             value={content}
             onChange={e => setContent(e.target.value)}
-            placeholder="Написать сообщение..."
-            className="flex-1 min-h-[40px] max-h-[120px] resize-none border-0 focus-visible:ring-0 px-0 py-2 bg-transparent"
+            placeholder={t('messages.type')}
+            className="flex-1 min-w-0 min-h-[40px] max-h-[120px] resize-none border-0 focus-visible:ring-0 px-0 py-2 bg-transparent"
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -792,7 +790,7 @@ function ChatThread({ conversationId, onBack }: { conversationId: number, onBack
               }
             }}
           />
-          <div className="flex items-center gap-1 pb-1">
+          <div className="flex items-center gap-1 pb-1 shrink-0">
             <label className="cursor-pointer p-2 text-muted-foreground hover:text-primary transition-colors rounded-full hover:bg-muted">
               <input 
                 type="file" 
@@ -805,7 +803,7 @@ function ChatThread({ conversationId, onBack }: { conversationId: number, onBack
               onClick={handleSend} 
               disabled={(!content.trim() && !pendingUpload) || isUploading || sendMessage.isPending}
               size="icon" 
-              className="rounded-full w-10 h-10"
+              className="rounded-full w-10 h-10 shrink-0"
             >
               {isUploading || sendMessage.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </Button>
@@ -826,6 +824,7 @@ function AdminReadonlyChatThread({
   onBack: () => void;
   currentUserClerkId: string;
 }) {
+  const { t } = useLanguage();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -848,15 +847,15 @@ function AdminReadonlyChatThread({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="h-16 px-4 md:px-6 border-b border-border/50 flex items-center gap-4 bg-amber-500/10 backdrop-blur">
-        <button onClick={onBack} className="md:hidden p-2 -ml-2 text-muted-foreground hover:text-foreground">
-          <X className="w-5 h-5" />
+      <div className="h-14 sm:h-16 px-3 sm:px-6 border-b border-border/50 flex items-center gap-2 sm:gap-4 bg-amber-500/10 backdrop-blur shrink-0">
+        <button onClick={onBack} className="md:hidden p-2 -ml-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" aria-label={t('messages.back')}>
+          <ArrowLeft className="w-5 h-5" />
         </button>
-        <Eye className="w-4 h-4 text-amber-600" />
-        <div className="font-bold font-serif text-lg">Просмотр беседы (только чтение)</div>
+        <Eye className="w-4 h-4 text-amber-600 shrink-0" />
+        <div className="font-bold font-serif text-base sm:text-lg truncate">Просмотр беседы (только чтение)</div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-6" ref={scrollRef}>
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-6" ref={scrollRef}>
         {loading ? (
           <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
         ) : (
@@ -917,7 +916,7 @@ function AttachmentPreview({ url, type, name, size, isMe }: { url: string, type:
   
   if (type === 'image') {
     return (
-      <div className="mt-2 relative group w-64 max-w-full rounded-xl overflow-hidden border border-black/10">
+      <div className="mt-2 relative group w-full max-w-[16rem] rounded-xl overflow-hidden border border-black/10">
         <img src={url} alt={name} className="w-full h-auto object-cover" />
         <a href={url} download target="_blank" rel="noreferrer" className="absolute top-2 right-2 p-2 bg-black/50 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur">
           <Download className="w-4 h-4" />
@@ -928,7 +927,7 @@ function AttachmentPreview({ url, type, name, size, isMe }: { url: string, type:
   
   if (type === 'video') {
     return (
-      <div className="mt-2 w-64 max-w-full rounded-xl overflow-hidden border border-black/10 bg-black">
+      <div className="mt-2 w-full max-w-[16rem] rounded-xl overflow-hidden border border-black/10 bg-black">
         <video src={url} controls className="w-full h-auto" />
       </div>
     );
@@ -940,7 +939,7 @@ function AttachmentPreview({ url, type, name, size, isMe }: { url: string, type:
       download 
       target="_blank" 
       rel="noreferrer"
-      className={`mt-2 flex items-center gap-3 p-3 rounded-xl border ${isMe ? 'bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/20' : 'bg-background border-border hover:border-primary/30 text-foreground'} transition-colors`}
+      className={`mt-2 flex items-center gap-3 p-3 rounded-xl border w-full max-w-[16rem] ${isMe ? 'bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/20' : 'bg-background border-border hover:border-primary/30 text-foreground'} transition-colors`}
     >
       <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isMe ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary'}`}>
         <FileText className="w-5 h-5" />

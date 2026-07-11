@@ -112,6 +112,99 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorPayload"
 
+  # ── FAQ ────────────────────────────────────────────────────────────────
+  /faq:
+    get:
+      operationId: listFaq
+      tags: [content]
+      summary: List all FAQ items (public)
+      responses:
+        "200":
+          description: FAQ items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListFaqPayload"
+    post:
+      operationId: createFaq
+      tags: [content]
+      summary: Create a FAQ item (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FaqInput"
+      responses:
+        "201":
+          description: Created FAQ item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaqItem"
+
+  /faq/{id}:
+    patch:
+      operationId: updateFaq
+      tags: [content]
+      summary: Update a FAQ item (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FaqUpdate"
+      responses:
+        "200":
+          description: Updated FAQ item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FaqItem"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
+    delete:
+      operationId: deleteFaq
+      tags: [content]
+      summary: Delete a FAQ item (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorPayload"
+
+  # ── Admin stats ──────────────────────────────────────────────────────────
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [content]
+      summary: Get dashboard summary counts (admin only)
+      responses:
+        "200":
+          description: Dashboard counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStatsPayload"
+
   # ── Posts ──────────────────────────────────────────────────────────────
   /posts:
     get:
@@ -1213,6 +1306,51 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/ContentItem"
+
+    # ── FAQ ────────────────────────────────────────────────────────────
+    FaqItem:
+      type: object
+      required: [id, question, answer, order, createdAt]
+      properties:
+        id: { type: integer }
+        question: { type: string }
+        answer: { type: string }
+        order: { type: integer }
+        createdAt: { type: string }
+
+    ListFaqPayload:
+      type: array
+      items:
+        $ref: "#/components/schemas/FaqItem"
+
+    FaqInput:
+      type: object
+      required: [question, answer]
+      properties:
+        question: { type: string, minLength: 1 }
+        answer: { type: string, minLength: 1 }
+        order: { type: integer }
+
+    FaqUpdate:
+      type: object
+      properties:
+        question: { type: string, minLength: 1 }
+        answer: { type: string, minLength: 1 }
+        order: { type: integer }
+
+    # ── Admin stats ────────────────────────────────────────────────────
+    AdminStatsPayload:
+      type: object
+      required: [posts, hadiths, admins, users, conversations, faq, messages, unreadMessages]
+      properties:
+        posts: { type: integer }
+        hadiths: { type: integer }
+        admins: { type: integer }
+        users: { type: integer }
+        conversations: { type: integer }
+        faq: { type: integer }
+        messages: { type: integer }
+        unreadMessages: { type: integer }
 
     # ── Posts ──────────────────────────────────────────────────────────
     PostAttachment:

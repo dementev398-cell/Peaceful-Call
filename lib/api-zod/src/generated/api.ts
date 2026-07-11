@@ -85,6 +85,92 @@ export const DeleteContentResponse = zod.void()
 
 
 /**
+ * @summary List all FAQ items (public)
+ */
+export const ListFaqResponseItem = zod.object({
+  "id": zod.number(),
+  "question": zod.string(),
+  "answer": zod.string(),
+  "order": zod.number(),
+  "createdAt": zod.string()
+})
+export const ListFaqResponse = zod.array(ListFaqResponseItem)
+
+
+/**
+ * @summary Create a FAQ item (admin only)
+ */
+
+
+
+
+export const CreateFaqBody = zod.object({
+  "question": zod.string().min(1),
+  "answer": zod.string().min(1),
+  "order": zod.number().optional()
+})
+
+export const CreateFaqResponse = zod.object({
+  "id": zod.number(),
+  "question": zod.string(),
+  "answer": zod.string(),
+  "order": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Update a FAQ item (admin only)
+ */
+export const UpdateFaqParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+
+export const UpdateFaqBody = zod.object({
+  "question": zod.string().min(1).optional(),
+  "answer": zod.string().min(1).optional(),
+  "order": zod.number().optional()
+})
+
+export const UpdateFaqResponse = zod.object({
+  "id": zod.number(),
+  "question": zod.string(),
+  "answer": zod.string(),
+  "order": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a FAQ item (admin only)
+ */
+export const DeleteFaqParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteFaqResponse = zod.void()
+
+
+/**
+ * @summary Get dashboard summary counts (admin only)
+ */
+export const GetAdminStatsResponse = zod.object({
+  "posts": zod.number(),
+  "hadiths": zod.number(),
+  "admins": zod.number(),
+  "users": zod.number(),
+  "conversations": zod.number(),
+  "faq": zod.number(),
+  "messages": zod.number(),
+  "unreadMessages": zod.number()
+})
+
+
+/**
  * @summary List published posts
  */
 export const ListPostsResponseItem = zod.object({
@@ -815,8 +901,6 @@ export const ListChatMessagesResponseItem = zod.object({
   "attachmentMimeType": zod.string().nullish(),
   "attachmentSize": zod.number().nullish(),
   "isDeleted": zod.boolean(),
-  "isEdited": zod.boolean(),
-  "editedAt": zod.string().nullish(),
   "isForwarded": zod.boolean(),
   "forwardedFromSenderName": zod.string().nullish(),
   "createdAt": zod.string()
@@ -856,7 +940,6 @@ export const SendChatMessageResponse = zod.object({
   "attachmentSize": zod.number().nullish(),
   "isDeleted": zod.boolean(),
   "isEdited": zod.boolean().optional(),
-  "editedAt": zod.string().nullish(),
   "isForwarded": zod.boolean(),
   "forwardedFromSenderName": zod.string().nullish(),
   "createdAt": zod.string()
@@ -890,40 +973,6 @@ export const DeleteChatMessageResponse = zod.void()
 
 
 /**
- * @summary Edit a chat message (sender only, text messages only)
- */
-export const EditChatMessageParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const EditChatMessageBody = zod.object({
-  "content": zod.string().min(1)
-})
-
-export const EditChatMessageResponse = zod.object({
-  "id": zod.number(),
-  "conversationId": zod.number(),
-  "senderClerkId": zod.string(),
-  "senderName": zod.string(),
-  "senderNickname": zod.string().nullish(),
-  "senderAvatarUrl": zod.string().nullish(),
-  "senderIsAdmin": zod.enum(['true', 'false']),
-  "content": zod.string().nullish(),
-  "attachmentUrl": zod.string().nullish(),
-  "attachmentType": zod.union([zod.literal('image'),zod.literal('video'),zod.literal('file'),zod.literal(null)]).nullish(),
-  "attachmentName": zod.string().nullish(),
-  "attachmentMimeType": zod.string().nullish(),
-  "attachmentSize": zod.number().nullish(),
-  "isDeleted": zod.boolean(),
-  "isEdited": zod.boolean(),
-  "editedAt": zod.string().nullish(),
-  "isForwarded": zod.boolean(),
-  "forwardedFromSenderName": zod.string().nullish(),
-  "createdAt": zod.string()
-})
-
-
-/**
  * @summary Forward a message to another conversation
  */
 export const ForwardChatMessageParams = zod.object({
@@ -932,6 +981,19 @@ export const ForwardChatMessageParams = zod.object({
 
 export const ForwardChatMessageBody = zod.object({
   "targetConversationId": zod.number()
+})
+
+export const EditChatMessageParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const EditChatMessageBody = zod.object({
+  "content": zod.string()
+})
+
+export const EditChatMessageResponse = zod.object({
+  "id": zod.number(),
+  "content": zod.string().nullish()
 })
 
 export const ForwardChatMessageResponse = zod.object({

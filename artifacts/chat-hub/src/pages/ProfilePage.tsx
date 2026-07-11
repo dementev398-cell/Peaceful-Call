@@ -3,13 +3,14 @@ import { Link } from "wouter";
 import { UserProfile, useUser } from "@clerk/react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { ArrowLeft, Camera, Loader2, User, X, Check, Clock, Settings } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, User, X, Check, Clock, Settings, MessageSquare } from "lucide-react";
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useGetMyProfile, useUpdateMyProfile, useRequestUploadUrl } from '@workspace/api-client-react';
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { attachmentSrc } from '@/lib/storage';
 
@@ -73,6 +74,7 @@ function CustomProfileSection() {
   const [nickname, setNickname] = useState('');
   const [isEditingNickname, setIsEditingNickname] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isSavingDms, setIsSavingDms] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (isLoading) {
@@ -84,6 +86,10 @@ function CustomProfileSection() {
   }
 
   if (!profile) return null;
+
+  // allowDirectMessages may be present on the extended profile response
+  const profileWithDms = profile as typeof profile & { allowDirectMessages?: boolean };
+  const allowDms = profileWithDms.allowDirectMessages ?? true;
 
   // Cooldown logic
   const nicknameNeverChanged =
@@ -185,6 +191,31 @@ function CustomProfileSection() {
     }
   };
 
+  const handleToggleAllowDms = async (checked: boolean) => {
+    setIsSavingDms(true);
+    try {
+      // We call PATCH /api/profile/me with allowDirectMessages
+      // The generated hook wraps the same endpoint; we call fetch directly
+      // since the generated client may not include this field.
+      const res = await fetch('/api/profile/me', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allowDirectMessages: checked }),
+      });
+      if (!res.ok) {
+        throw new Error(t('profile.saveError'));
+      }
+      await refetch();
+      toast({ title: '✓', description: t('profile.dmsSaved') });
+    } catch (err: unknown) {
+      const e = err as { message?: string } | null;
+      toast({ title: t('nickname.error'), description: e?.message || t('profile.saveError'), variant: 'destructive' });
+    } finally {
+      setIsSavingDms(false);
+    }
+  };
+
   const avatarSrc = profile.avatarUrl ? attachmentSrc(profile.avatarUrl) : '';
 
   // Full name from Clerk — only shown when it actually exists on the user object
@@ -245,7 +276,7 @@ function CustomProfileSection() {
           </div>
         </div>
 
-        {/* Right column: nickname + optional full name */}
+        {/* Right column: nickname + optional full name + DM toggle */}
         <div className="flex-1 min-w-0 space-y-5" dir={isRtl ? 'rtl' : 'ltr'}>
           {/* Nickname field */}
           <div>
@@ -323,6 +354,35 @@ function CustomProfileSection() {
               <p className="text-xs text-muted-foreground mt-1.5">{t('profile.fullNameHint')}</p>
             </div>
           )}
+
+          {/* Allow DMs toggle */}
+          <div className="pt-2 border-t border-border/20">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-start gap-2 flex-1 min-w-0">
+                <MessageSquare className="w-4 h-4 text-primary/60 mt-0.5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-foreground block">
+                    {t('profile.allowDmsLabel')}
+                  </span>
+                  <span className="text-xs text-muted-foreground block mt-0.5">
+                    {t('profile.allowDmsHint')}
+                  </span>
+                </div>
+              </div>
+              <div className="flex-shrink-0">
+                {isSavingDms
+                  ? <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                  : (
+                    <Switch
+                      checked={allowDms}
+                      onCheckedChange={handleToggleAllowDms}
+                      disabled={isSavingDms}
+                    />
+                  )
+                }
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

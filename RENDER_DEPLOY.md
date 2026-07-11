@@ -1,53 +1,88 @@
 # Деплой на Render.com — пошаговая инструкция
 
+Проект **Peaceful Call** разворачивается на Render.com через Blueprint (`render.yaml`).
+Развёртывание состоит из трёх сервисов, описанных в `render.yaml`:
+
+- `peaceful-call-db` — **управляемая база данных PostgreSQL** (Render Managed Postgres)
+- `peaceful-call-api` — Web Service (Node/Express API)
+- `peaceful-call-web` — Static Site (React/Vite фронтенд)
+
+---
+
+## Про requirements.txt
+
+Это **Node/pnpm** проект, а не Python — поэтому файла `requirements.txt` здесь нет и он не нужен.
+Его аналогом в Node-экосистеме являются `package.json` и `pnpm-lock.yaml`, которые уже присутствуют
+в репозитории. Render устанавливает зависимости командой `pnpm install --frozen-lockfile`
+(указана в `buildCommand`), используя именно `pnpm-lock.yaml` для воспроизводимой установки.
+
+---
+
 ## Предварительные требования
 
 - Аккаунт на [Render.com](https://render.com)
-- Репозиторий подключён к Render (GitHub/GitLab)
-- Аккаунт Clerk **production** инстанс (важно: не development!)
-- База данных PostgreSQL (Render Managed Postgres или внешняя)
+- Репозиторий подключён к Render (GitHub / GitLab)
+- Аккаунт Clerk с **production**-инстансом (важно: не development!)
+- S3-совместимое хранилище (например AWS S3) — см. раздел «Объектное хранилище»
 
 ---
 
-## Шаг 1 — Миграция базы данных
-
-Перед первым запуском необходимо применить схему Drizzle к вашей БД.
-
-Выполните локально (с `DATABASE_URL` указывающим на продакшен-БД):
-
-```bash
-DATABASE_URL="postgresql://..." pnpm --filter @workspace/db run push
-```
-
-Или через `push-force` если нужно принудительно:
-
-```bash
-DATABASE_URL="postgresql://..." pnpm --filter @workspace/db run push-force
-```
-
----
-
-## Шаг 2 — Создание Blueprint через render.yaml
+## Шаг 1 — Подключение репозитория и создание Blueprint
 
 1. В Render Dashboard нажмите **New → Blueprint**
 2. Выберите ваш репозиторий
-3. Render автоматически обнаружит `render.yaml` в корне и предложит создать два сервиса:
+3. Render автоматически найдёт `render.yaml` в корне и предложит создать ресурсы:
+   - `peaceful-call-db` — управляемая PostgreSQL база
    - `peaceful-call-api` — Web Service (API)
    - `peaceful-call-web` — Static Site (фронтенд)
+4. Подтвердите создание Blueprint
 
 ---
 
-## Шаг 3 — Переменные окружения (задать вручную в Dashboard)
+## Шаг 2 — База данных: автоматически и без потери данных
+
+База данных **объявлена прямо в `render.yaml`** (блок `databases:`), поэтому Render:
+
+- сам создаёт **одну** управляемую PostgreSQL базу `peaceful-call-db` (регион Frankfurt, план Starter);
+- **сохраняет** её между всеми деплоями — повторный деплой **никогда не удаляет и не пересоздаёт** базу,
+  данные не стираются;
+- сам подставляет строку подключения в API-сервис через `fromDatabase` (свойство `connectionString`)
+  в переменную `DATABASE_URL`. **Вручную задавать `DATABASE_URL` не нужно** — она приходит автоматически.
+
+### Применение схемы (миграции) при деплое
+
+В API-сервисе задан `preDeployCommand`:
+
+```
+pnpm --filter @workspace/db run push
+```
+
+Эта команда (`drizzle-kit push`) выполняется перед каждым деплоем и **идемпотентно** приводит БД
+к текущей схеме: создаёт недостающие таблицы и колонки.
+
+> ⚠️ **Важно о безопасности данных.** `drizzle-kit push` безопасен для **аддитивных** изменений
+> (добавление таблиц/колонок) — существующие данные при этом не теряются. Однако при
+> **деструктивных** изменениях схемы (удаление/переименование колонки или таблицы, сужение типа)
+> `drizzle-kit push` может предложить удалить данные. В неинтерактивном окружении Render такие
+> изменения либо будут пропущены, либо приведут к падению деплоя (что защищает данные).
+> Для деструктивных изменений применяйте схему вручную и осознанно, а не полагайтесь на автоматический
+> `push`. Никогда не используйте `push-force` на продакшене без резервной копии.
+
+---
+
+## Шаг 3 — Секреты (задать вручную в Dashboard)
+
+Все секреты в `render.yaml` помечены `sync: false` — их нужно ввести один раз в Render Dashboard
+после создания сервисов. `DATABASE_URL` в этот список **не входит** — она приходит от управляемой БД.
 
 ### API-сервис (`peaceful-call-api`)
 
 | Переменная | Описание |
 |---|---|
-| `CLERK_SECRET_KEY` | Секретный ключ Clerk (из Clerk Dashboard → API Keys) |
-| `CLERK_PUBLISHABLE_KEY` | Публичный ключ Clerk (из Clerk Dashboard → API Keys) |
-| `CORS_ALLOWED_ORIGINS` | URL фронтенда, например `https://peaceful-call-web.onrender.com` |
-| `DATABASE_URL` | Строка подключения PostgreSQL (Render Managed Postgres или внешняя) |
+| `CLERK_SECRET_KEY` | Секретный ключ Clerk (`sk_live_...`) из Clerk Dashboard → API Keys |
+| `CLERK_PUBLISHABLE_KEY` | Публичный ключ Clerk (`pk_live_...`) из Clerk Dashboard → API Keys |
 | `SESSION_SECRET` | Случайная строка 32+ символов для подписи сессий |
+| `CORS_ALLOWED_ORIGINS` | Разрешённые источники через запятую, например `https://peaceful-call-web.onrender.com` |
 | `S3_REGION` | Регион S3-бакета, например `eu-central-1` |
 | `S3_ACCESS_KEY_ID` | Access Key ID для S3 |
 | `S3_SECRET_ACCESS_KEY` | Secret Access Key для S3 |
@@ -55,38 +90,73 @@ DATABASE_URL="postgresql://..." pnpm --filter @workspace/db run push-force
 | `PUBLIC_OBJECT_SEARCH_PATHS` | Пути к публичным объектам в бакете (через запятую) |
 | `PRIVATE_OBJECT_DIR` | Путь к директории приватных объектов в бакете |
 
-> `OBJECT_STORAGE_PROVIDER` уже выставлен в `s3` в render.yaml — менять не нужно.
+> `OBJECT_STORAGE_PROVIDER` уже выставлен в `s3` в `render.yaml` — менять не нужно.
+> Для S3-совместимых провайдеров (Backblaze B2, MinIO и др.) дополнительно задайте `S3_ENDPOINT`.
 
 ### Фронтенд (`peaceful-call-web`)
 
 | Переменная | Описание |
 |---|---|
-| `VITE_CLERK_PUBLISHABLE_KEY` | Публичный ключ Clerk (тот же, что для API) |
+| `VITE_CLERK_PUBLISHABLE_KEY` | Публичный ключ Clerk (тот же `pk_live_...`, что и для API) |
 | `VITE_API_BASE_URL` | Полный URL API-сервиса, например `https://peaceful-call-api.onrender.com` |
 
 ---
 
-## Шаг 4 — Переключение Clerk на Production-инстанс
+## Шаг 4 — Clerk: обязательно PRODUCTION-инстанс
 
-⚠️ **Важно:** ключи Clerk в режиме разработки (`pk_test_...`, `sk_test_...`) не работают корректно в продакшене.
+⚠️ **Важно:** ключи Clerk режима разработки (`pk_test_...`, `sk_test_...`) **не работают корректно**
+в продакшене и приведут к поломке авторизации.
 
-1. В Clerk Dashboard создайте (или переключитесь на) **Production** инстанс
+1. В Clerk Dashboard создайте (или переключитесь на) **Production**-инстанс
 2. Скопируйте `Publishable Key` (`pk_live_...`) и `Secret Key` (`sk_live_...`)
-3. Укажите их в переменных окружения обоих сервисов
-4. В Clerk Dashboard в разделе **Domains** добавьте домен вашего Render-фронтенда
+3. Укажите:
+   - `CLERK_SECRET_KEY` и `CLERK_PUBLISHABLE_KEY` — в API-сервисе
+   - `VITE_CLERK_PUBLISHABLE_KEY` — в сервисе фронтенда (тот же публичный ключ)
+4. В Clerk Dashboard в разделе **Domains** добавьте домен Render-фронтенда, чтобы Clerk принимал
+   запросы с продакшн-домена
 
 ---
 
-## Шаг 5 — Первый деплой
+## Шаг 5 — Объектное хранилище (S3)
 
-1. После настройки всех переменных нажмите **Deploy** для каждого сервиса
-2. Проверьте health-check API: `https://peaceful-call-api.onrender.com/api/healthz`
-3. Откройте фронтенд и убедитесь, что авторизация и запросы к API работают
+- GCS-сайдкар (`gcs-sidecar`) работает **только внутри Replit** и на Render недоступен.
+- На Render используется **S3** (`OBJECT_STORAGE_PROVIDER=s3` уже задан в `render.yaml`).
+- Вам нужно создать S3-бакет (AWS S3 или совместимый) и задать переменные `S3_*`,
+  `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR` (см. Шаг 3).
+
+### Что реально поддерживает код (честно)
+
+Код API (`lib/objectStorage.ts`) действительно содержит рабочий S3-бэкенд:
+выбор провайдера, presigned-URL для загрузки/скачивания (PUT/GET), проверка существования объекта
+(HEAD), потоковая отдача файла. Базовая загрузка и раздача файлов через S3 работают.
+
+**Ограничение, о котором нужно знать:** система контроля доступа (ACL) для S3 **не реализована**:
+
+- `trySetObjectEntityAclPolicy` для S3 — это заглушка (no-op), политики доступа не сохраняются;
+- `canAccessObjectEntity` для приватных S3-объектов всегда возвращает `false`.
+
+Следствие: механизм public/private ACL, работающий для GCS, на S3 не действует. Публичная раздача
+через `PUBLIC_OBJECT_SEARCH_PATHS` и presigned-загрузка работают, но **тонкий per-object контроль
+доступа для приватных файлов на S3 отсутствует**. Если для вашего сценария нужен полноценный
+приватный доступ с проверкой прав, потребуется дописать ACL-слой для S3 (например хранить метаданные
+доступа в БД или в объектных метаданных S3 и реализовать проверку в `canAccessObjectEntity`).
+
+---
+
+## Шаг 6 — Деплой и проверка
+
+1. Убедитесь, что все секреты (`sync: false`) заданы для обоих сервисов
+2. Запустите деплой (Render сделает это автоматически после сохранения Blueprint и секретов)
+3. При деплое API: сначала выполнится `preDeployCommand` (применение схемы к БД), затем запуск
+4. Проверьте health-check API: `https://peaceful-call-api.onrender.com/api/healthz`
+   — должен вернуть `{"status":"ok"}`
+5. Откройте фронтенд и убедитесь, что авторизация Clerk и запросы к API работают
 
 ---
 
 ## Заметки
 
-- Render на бесплатном плане усыпляет сервисы при неактивности — рекомендуется план Starter
-- Для S3-совместимых провайдеров (Backblaze B2, MinIO и др.) дополнительно укажите `S3_ENDPOINT`
-- Логи API-сервиса доступны в Render Dashboard → Logs
+- На бесплатном плане Render усыпляет сервисы при неактивности — рекомендуется план Starter (уже задан).
+- Автодеплой: при каждом push в подключённую ветку Render пересобирает сервисы; управляемая БД
+  при этом сохраняется, данные не теряются.
+- Логи API-сервиса доступны в Render Dashboard → сервис `peaceful-call-api` → Logs.

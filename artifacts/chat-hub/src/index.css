@@ -25,6 +25,98 @@
   letter-spacing: 0.05em !important;
 }
 
+/* ── Clerk avatar-upload / file-drop dialog contrast fixes ──────────────────
+   All selectors are Clerk's stable BEM classnames; they are unlayered so they
+   beat the `@layer clerk` block that Clerk injects without needing !important
+   on specificity grounds.  We explicitly pass !important only where Clerk's
+   own inline-style or high-specificity rule would otherwise win.
+
+   General principle: every text element inside Clerk modals and popovers must
+   have enough contrast against the dark background (hsl(224 24% 4%)) that the
+   app uses.  Clerk's defaults assume a light background, so text that is
+   dark-gray on light-gray becomes invisible on our dark theme.             */
+
+/* File-drop zone container */
+.cl-fileDropAreaBox {
+  background-color: hsl(224 20% 8%) !important;
+  border-color: hsl(224 16% 20%) !important;
+  color: hsl(40 10% 96%) !important;
+}
+
+/* Instruction text inside the drop area ("Drag & drop a file…") */
+.cl-fileDropAreaIconBox,
+.cl-fileDropAreaFooterHint,
+.cl-fileDropAreaFooterText {
+  color: hsl(220 12% 70%) !important;
+}
+
+/* "Upload" / "Browse" link inside the drop area */
+.cl-fileDropAreaButtonPrimary {
+  color: hsl(43 85% 65%) !important;
+}
+
+/* Avatar image action buttons ("Upload", "Remove image") */
+.cl-avatarImageActionsUpload,
+.cl-avatarImageActionsRemove {
+  color: hsl(40 10% 96%) !important;
+  background-color: hsl(224 20% 10%) !important;
+  border-color: hsl(224 16% 20%) !important;
+}
+.cl-avatarImageActionsUpload:hover,
+.cl-avatarImageActionsRemove:hover {
+  background-color: hsl(224 20% 14%) !important;
+  border-color: hsl(43 85% 58% / 0.4) !important;
+}
+
+/* Generic "reset" / secondary action buttons in modals */
+.cl-formButtonReset,
+.cl-formResendCodeLink {
+  color: hsl(43 85% 65%) !important;
+}
+.cl-formButtonReset:hover,
+.cl-formResendCodeLink:hover {
+  color: hsl(43 85% 80%) !important;
+}
+
+/* Section headings inside Clerk's UserProfile panels */
+.cl-profileSectionTitle,
+.cl-profileSectionTitleText {
+  color: hsl(40 10% 96%) !important;
+}
+
+/* Accordion / list items (e.g. connected accounts row) */
+.cl-accordionTriggerButton,
+.cl-menuItem,
+.cl-menuList {
+  color: hsl(40 10% 96%) !important;
+}
+
+/* "Danger zone" / destructive text */
+.cl-profileSectionItem__danger,
+.cl-userPreviewSecondaryIdentifier {
+  color: hsl(220 12% 65%) !important;
+}
+
+/* Modal/dialog overlay card — ensure dark background rather than grey */
+.cl-modalContent,
+.cl-card {
+  background-color: hsl(224 20% 6%) !important;
+  color: hsl(40 10% 96%) !important;
+}
+
+/* Input helper / hint text below fields */
+.cl-formFieldHintText,
+.cl-formFieldInfoText,
+.cl-formFieldSuccessText {
+  color: hsl(220 12% 65%) !important;
+}
+.cl-formFieldSuccessText {
+  color: hsl(120 40% 60%) !important;
+}
+.cl-formFieldErrorText {
+  color: hsl(0 70% 65%) !important;
+}
+
 @theme inline {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));

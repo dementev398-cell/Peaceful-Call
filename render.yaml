@@ -1,3 +1,14 @@
+# -----------------------------------------------------------------------------
+# Render-managed PostgreSQL database (persistent across deploys).
+# Declaring the DB in the blueprint means Render provisions ONE database and
+# keeps it across every redeploy — a redeploy never drops or recreates it.
+# The connection string is wired into the API service via `fromDatabase` below.
+# -----------------------------------------------------------------------------
+databases:
+  - name: peaceful-call-db
+    plan: starter
+    region: frankfurt
+
 services:
   # ---------------------------------------------------------------------------
   # API — Node/Express backend
@@ -12,6 +23,11 @@ services:
       pnpm install --frozen-lockfile &&
       pnpm --filter @workspace/api-server run build
     startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
+    # Apply the Drizzle schema to the managed DB before each deploy goes live.
+    # `drizzle-kit push` is idempotent and additive-safe: it creates missing
+    # tables/columns without dropping existing data. It runs against the
+    # DATABASE_URL injected from the managed database below.
+    preDeployCommand: pnpm --filter @workspace/db run push
     healthCheckPath: /api/healthz
     envVars:
       - key: NODE_ENV
@@ -43,8 +59,12 @@ services:
         sync: false
       - key: PRIVATE_OBJECT_DIR
         sync: false
+      # Auto-provided by the Render-managed database declared above.
+      # This persists across deploys and is never wiped by a redeploy.
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: peaceful-call-db
+          property: connectionString
       - key: SESSION_SECRET
         sync: false
 

@@ -223,10 +223,27 @@ router.post(
         ),
       );
     if (existing) {
+      // Always allow if a conversation already exists — don't retroactively block
       res
         .status(200)
         .json(StartDirectConversationResponse.parse({ id: existing.id }));
       return;
+    }
+
+    // Check if the target user allows direct messages.
+    // Admins/owners can always initiate (mirrors the support-conversation bypass pattern).
+    const senderIsAdmin = await isAdmin(me.clerkUserId);
+    if (!senderIsAdmin) {
+      const [targetAppUser] = await db
+        .select({ allowDirectMessages: appUsersTable.allowDirectMessages })
+        .from(appUsersTable)
+        .where(eq(appUsersTable.clerkUserId, targetId));
+      if (targetAppUser && !targetAppUser.allowDirectMessages) {
+        res.status(403).json({
+          error: "Этот пользователь отключил личные сообщения.",
+        });
+        return;
+      }
     }
 
     const [created] = await db

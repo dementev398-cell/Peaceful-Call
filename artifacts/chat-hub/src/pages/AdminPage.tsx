@@ -28,8 +28,14 @@ import {
   useDeleteMessage,
   useGetUnreadCount,
   useUpdateMyAdminAvatar,
+  useListFaq,
+  useCreateFaq,
+  useUpdateFaq,
+  useDeleteFaq,
+  useGetAdminStats,
   type ContentItem,
-  type PostAttachment
+  type PostAttachment,
+  type FaqItem
 } from '@workspace/api-client-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -57,7 +63,8 @@ import {
   ShieldAlert, LogIn, Users, Ban,
   ChevronLeft, FileText, Settings, LayoutDashboard,
   ScrollText, Paperclip, Film, Camera, ShieldCheck, ShieldOff,
-  Home, Eye, Maximize2, Minimize2
+  Home, Eye, Maximize2, Minimize2, HelpCircle, ArrowUp, ArrowDown,
+  MessagesSquare, Inbox
 } from 'lucide-react';
 import { useClerk, useUser } from '@clerk/react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -196,8 +203,8 @@ export default function AdminPage() {
 
   const isOwner = user.role === 'owner';
   const tabs = isOwner
-    ? ['content', 'posts', 'hadiths', 'messages', 'users', 'admins']
-    : ['posts', 'hadiths', 'messages'];
+    ? ['dashboard', 'content', 'faq', 'posts', 'hadiths', 'messages', 'users', 'admins']
+    : ['dashboard', 'posts', 'hadiths', 'messages'];
 
   const roleLabel = isOwner
     ? (language === 'RU' ? 'Владелец' : language === 'AR' ? 'مالك' : 'Owner')
@@ -233,7 +240,7 @@ export default function AdminPage() {
                 className="flex-1 inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-full text-[11px] font-bold text-muted-foreground border border-border/50 hover:border-primary/40 hover:text-primary transition-all bg-card/40"
               >
                 <Home className="w-3 h-3" />
-                Вернуться на главную
+                {t('admin.backHome')}
               </Link>
               <AdminAvatarWidget adminId={user.id ?? 0} />
               <Button
@@ -269,7 +276,7 @@ export default function AdminPage() {
                 className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full text-xs font-bold text-muted-foreground border border-border/50 hover:border-primary/40 hover:text-primary transition-all bg-card/40 backdrop-blur-sm whitespace-nowrap"
               >
                 <Home className="w-3.5 h-3.5" />
-                Вернуться на главную
+                {t('admin.backHome')}
               </Link>
               <span className="text-xs text-muted-foreground hidden lg:block truncate max-w-[180px]">{user.email}</span>
               <AdminAvatarWidget adminId={user.id ?? 0} />
@@ -292,11 +299,20 @@ export default function AdminPage() {
           {/* Scrollable tabs strip */}
           <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 mb-6 sm:mb-8 pb-1">
             <TabsList className="inline-flex bg-card/40 glass border border-border/30 p-1 sm:p-1.5 rounded-2xl gap-0.5 sm:gap-1 min-w-max shadow-inner">
+              <TabsTrigger value="dashboard" className="rounded-xl text-[11px] sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:glow-gold-sm whitespace-nowrap px-3 sm:px-4 py-2 sm:py-2.5 gap-1.5 sm:gap-2 transition-all font-semibold text-muted-foreground data-[state=active]:font-bold">
+                <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                {t('admin.dashboard')}
+              </TabsTrigger>
               {isOwner && (
                 <TabsTrigger value="content" className="rounded-xl text-[11px] sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:glow-gold-sm whitespace-nowrap px-3 sm:px-4 py-2 sm:py-2.5 gap-1.5 sm:gap-2 transition-all font-semibold text-muted-foreground data-[state=active]:font-bold">
                   <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span className="hidden xs:inline">{t('admin.content')}</span>
-                  <span className="xs:hidden">Контент</span>
+                  {t('admin.content')}
+                </TabsTrigger>
+              )}
+              {isOwner && (
+                <TabsTrigger value="faq" className="rounded-xl text-[11px] sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:glow-gold-sm whitespace-nowrap px-3 sm:px-4 py-2 sm:py-2.5 gap-1.5 sm:gap-2 transition-all font-semibold text-muted-foreground data-[state=active]:font-bold">
+                  <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  {t('admin.faq')}
                 </TabsTrigger>
               )}
               <TabsTrigger value="posts" className="rounded-xl text-[11px] sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:glow-gold-sm whitespace-nowrap px-3 sm:px-4 py-2 sm:py-2.5 gap-1.5 sm:gap-2 transition-all font-semibold text-muted-foreground data-[state=active]:font-bold">
@@ -331,9 +347,17 @@ export default function AdminPage() {
             </TabsList>
           </div>
 
+          <TabsContent value="dashboard" className="mt-0">
+            <DashboardManager isOwner={isOwner} />
+          </TabsContent>
           {isOwner && (
             <TabsContent value="content" className="mt-0">
               <ContentManager />
+            </TabsContent>
+          )}
+          {isOwner && (
+            <TabsContent value="faq" className="mt-0">
+              <FaqManager />
             </TabsContent>
           )}
           <TabsContent value="posts" className="mt-0">
@@ -368,6 +392,7 @@ function AdminAvatarWidget({ adminId }: { adminId: number }) {
   const requestUploadUrl = useRequestUploadUrl();
   const { dict } = useContentDict();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -385,9 +410,9 @@ function AdminAvatarWidget({ adminId }: { adminId: number }) {
       });
       await fetch(uploadURL, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
       await updateAvatar.mutateAsync({ data: { avatarUrl: objectPath } });
-      toast({ title: '✓', description: 'Аватар обновлён' });
+      toast({ title: '✓', description: t('admin.avatarUpdated') });
     } catch (e: any) {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+      toast({ title: t('admin.error'), description: e.message, variant: 'destructive' });
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -397,9 +422,9 @@ function AdminAvatarWidget({ adminId }: { adminId: number }) {
   const handleRemove = async () => {
     try {
       await updateAvatar.mutateAsync({ data: { avatarUrl: null } });
-      toast({ title: '✓', description: 'Аватар удалён' });
+      toast({ title: '✓', description: t('admin.avatarRemoved') });
     } catch (e: any) {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+      toast({ title: t('admin.error'), description: e.message, variant: 'destructive' });
     }
   };
 
@@ -425,7 +450,7 @@ function AdminAvatarWidget({ adminId }: { adminId: number }) {
           size="icon"
           className="h-7 w-7 text-muted-foreground/50 hover:text-primary rounded-lg"
           onClick={() => fileInputRef.current?.click()}
-          title="Изменить аватар"
+          title={t('admin.changeAvatar')}
         >
           <Camera className="w-3 h-3" />
         </Button>
@@ -435,7 +460,7 @@ function AdminAvatarWidget({ adminId }: { adminId: number }) {
             size="icon"
             className="h-7 w-7 text-muted-foreground/50 hover:text-destructive rounded-lg"
             onClick={handleRemove}
-            title="Удалить аватар"
+            title={t('admin.removeAvatar')}
           >
             <X className="w-3 h-3" />
           </Button>
@@ -462,15 +487,16 @@ function SectionHeader({ icon: Icon, title, description }: { icon: React.Element
 
 // ── Status badge helper ───────────────────────────────────────────────────────
 function StatusBadge({ published }: { published: boolean }) {
+  const { t } = useLanguage();
   return published ? (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20">
       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-      Опубл.
+      {t('admin.published')}
     </span>
   ) : (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-bold uppercase tracking-wider border border-amber-500/20">
       <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-      Черновик
+      {t('admin.draft')}
     </span>
   );
 }
@@ -920,16 +946,279 @@ function MessagesManager({ userRole }: { userRole: string }) {
   );
 }
 
+// ── Dashboard Manager ─────────────────────────────────────────────────────────
+function DashboardManager({ isOwner }: { isOwner: boolean }) {
+  const { t } = useLanguage();
+  const { data: stats, isLoading, isError } = useGetAdminStats();
+
+  const cards: { key: string; label: string; value: number; icon: React.ElementType; ownerOnly?: boolean }[] = [
+    { key: 'posts', label: t('admin.statPosts'), value: stats?.posts ?? 0, icon: FileText },
+    { key: 'hadiths', label: t('admin.statHadiths'), value: stats?.hadiths ?? 0, icon: ScrollText },
+    { key: 'faq', label: t('admin.statFaq'), value: stats?.faq ?? 0, icon: HelpCircle, ownerOnly: true },
+    { key: 'messages', label: t('admin.statMessages'), value: stats?.messages ?? 0, icon: Inbox },
+    { key: 'unread', label: t('admin.statUnread'), value: stats?.unreadMessages ?? 0, icon: Mail },
+    { key: 'conversations', label: t('admin.statConversations'), value: stats?.conversations ?? 0, icon: MessagesSquare, ownerOnly: true },
+    { key: 'users', label: t('admin.statUsers'), value: stats?.users ?? 0, icon: Users, ownerOnly: true },
+    { key: 'admins', label: t('admin.statAdmins'), value: stats?.admins ?? 0, icon: Shield, ownerOnly: true },
+  ];
+
+  const visible = cards.filter((c) => isOwner || !c.ownerOnly);
+
+  return (
+    <div className="space-y-7">
+      <SectionHeader icon={LayoutDashboard} title={t('admin.dashboard')} description={t('admin.dashboardDesc')} />
+
+      {isError ? (
+        <div className="text-center py-16 bg-card/40 border border-dashed border-destructive/40 rounded-2xl">
+          <ShieldAlert className="w-10 h-10 mx-auto mb-3 text-destructive/50" />
+          <p className="text-sm text-muted-foreground">{t('admin.statsError')}</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          {visible.map((c, idx) => (
+            <motion.div
+              key={c.key}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.04 }}
+              className="glass border border-border/40 rounded-2xl p-4 sm:p-5 shadow-lg shadow-black/10 hover:border-primary/30 hover:shadow-primary/5 transition-all group"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:glow-gold-sm transition-all">
+                  <c.icon className="w-4 h-4 text-primary" />
+                </div>
+              </div>
+              <div className="text-2xl sm:text-3xl font-serif font-bold text-foreground tabular-nums leading-none">
+                {isLoading ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground/50" /> : c.value}
+              </div>
+              <p className="text-[11px] sm:text-xs text-muted-foreground font-medium mt-1.5 leading-tight">{c.label}</p>
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── FAQ Manager ───────────────────────────────────────────────────────────────
+function FaqManager() {
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  const { data: items = [], isLoading, refetch } = useListFaq();
+  const create = useCreateFaq();
+  const update = useUpdateFaq();
+  const remove = useDeleteFaq();
+
+  const [addingNew, setAddingNew] = useState(false);
+  const [newItem, setNewItem] = useState({ question: '', answer: '' });
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState({ question: '', answer: '' });
+  const [pendingDelete, setPendingDelete] = useState<FaqItem | null>(null);
+  const [reordering, setReordering] = useState(false);
+
+  if (isLoading) return <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+
+  const sorted = [...items].sort((a, b) => a.order - b.order || a.id - b.id);
+
+  const handleAdd = async () => {
+    if (!newItem.question.trim() || !newItem.answer.trim()) {
+      toast({ title: t('admin.error'), description: t('admin.faqRequired'), variant: 'destructive' });
+      return;
+    }
+    try {
+      const nextOrder = sorted.length > 0 ? Math.max(...sorted.map((i) => i.order)) + 1 : 0;
+      await create.mutateAsync({ data: { question: newItem.question.trim(), answer: newItem.answer.trim(), order: nextOrder } });
+      toast({ title: '✓', description: t('admin.saved') });
+      setNewItem({ question: '', answer: '' });
+      setAddingNew(false);
+      await refetch();
+    } catch (e: any) {
+      toast({ title: t('admin.error'), description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const startEdit = (item: FaqItem) => {
+    setEditId(item.id);
+    setEditDraft({ question: item.question, answer: item.answer });
+  };
+
+  const handleSaveEdit = async (item: FaqItem) => {
+    if (!editDraft.question.trim() || !editDraft.answer.trim()) {
+      toast({ title: t('admin.error'), description: t('admin.faqRequired'), variant: 'destructive' });
+      return;
+    }
+    try {
+      await update.mutateAsync({ id: item.id, data: { question: editDraft.question.trim(), answer: editDraft.answer.trim() } });
+      toast({ title: '✓', description: t('admin.saved') });
+      setEditId(null);
+      await refetch();
+    } catch (e: any) {
+      toast({ title: t('admin.error'), description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!pendingDelete) return;
+    const item = pendingDelete;
+    setPendingDelete(null);
+    try {
+      await remove.mutateAsync({ id: item.id });
+      toast({ title: '✓', description: t('admin.saved') });
+      await refetch();
+    } catch (e: any) {
+      toast({ title: t('admin.error'), description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const move = async (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= sorted.length) return;
+    const a = sorted[index];
+    const b = sorted[target];
+    setReordering(true);
+    try {
+      await Promise.all([
+        update.mutateAsync({ id: a.id, data: { order: b.order } }),
+        update.mutateAsync({ id: b.id, data: { order: a.order } }),
+      ]);
+      await refetch();
+    } catch (e: any) {
+      toast({ title: t('admin.error'), description: e.message, variant: 'destructive' });
+    } finally {
+      setReordering(false);
+    }
+  };
+
+  return (
+    <div className="space-y-7">
+      {pendingDelete && (
+        <ConfirmDialog
+          open={!!pendingDelete}
+          title={t('admin.faqDeleteTitle')}
+          description={t('admin.faqDeleteDesc')}
+          confirmLabel={t('admin.delete')}
+          onConfirm={handleDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <SectionHeader icon={HelpCircle} title={t('admin.faqMgmt')} description={t('admin.faqDesc')} />
+        <Button variant="outline" size="sm" onClick={() => setAddingNew(!addingNew)} className="rounded-full gap-1.5 text-xs h-9 self-start">
+          <Plus className="w-3.5 h-3.5" />
+          {t('admin.faqAdd')}
+        </Button>
+      </div>
+
+      {addingNew && (
+        <div className="glass border border-primary/20 rounded-2xl p-5 space-y-4 shadow-lg shadow-primary/5">
+          <h4 className="text-sm font-bold text-primary flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            {t('admin.faqAdd')}
+          </h4>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block font-medium">{t('admin.faqQuestion')}</label>
+              <Input value={newItem.question} onChange={(e) => setNewItem({ ...newItem, question: e.target.value })} placeholder={t('admin.faqQuestionPlaceholder')} className="bg-background/50 h-9 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block font-medium">{t('admin.faqAnswer')}</label>
+              <Textarea value={newItem.answer} onChange={(e) => setNewItem({ ...newItem, answer: e.target.value })} placeholder={t('admin.faqAnswerPlaceholder')} className="bg-background/50 min-h-[100px] resize-none text-sm rounded-xl" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleAdd} disabled={create.isPending} className="rounded-full gap-1.5 text-sm h-9">
+              {create.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+              {t('admin.faqAdd')}
+            </Button>
+            <Button variant="ghost" onClick={() => { setAddingNew(false); setNewItem({ question: '', answer: '' }); }} className="rounded-full text-sm h-9">
+              {t('admin.cancel')}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {sorted.length === 0 ? (
+        <div className="text-center py-16 bg-card/40 border border-dashed border-border/50 rounded-2xl">
+          <HelpCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground/20" />
+          <p className="text-muted-foreground font-serif">{t('admin.faqEmpty')}</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {sorted.map((item, idx) => {
+            const isEditing = editId === item.id;
+            return (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.03 }}
+                className={`rounded-2xl border p-4 sm:p-5 transition-all ${isEditing ? 'border-primary/30 bg-primary/4 shadow-sm shadow-primary/5' : 'border-border/40 bg-card/50 hover:border-border/70'}`}
+              >
+                {isEditing ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block font-medium">{t('admin.faqQuestion')}</label>
+                      <Input value={editDraft.question} onChange={(e) => setEditDraft({ ...editDraft, question: e.target.value })} className="bg-background/50 h-9 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block font-medium">{t('admin.faqAnswer')}</label>
+                      <Textarea value={editDraft.answer} onChange={(e) => setEditDraft({ ...editDraft, answer: e.target.value })} className="bg-background/50 min-h-[100px] resize-none text-sm rounded-xl" />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={() => handleSaveEdit(item)} disabled={update.isPending} className="rounded-full gap-1.5 text-sm h-9">
+                        {update.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                        {t('admin.save')}
+                      </Button>
+                      <Button variant="ghost" onClick={() => setEditId(null)} className="rounded-full text-sm h-9">
+                        {t('admin.cancel')}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3">
+                    <div className="flex flex-col gap-0.5 flex-shrink-0 pt-0.5">
+                      <Button variant="ghost" size="icon" onClick={() => move(idx, -1)} disabled={idx === 0 || reordering} title={t('admin.moveUp')} className="h-6 w-6 rounded-md text-muted-foreground/50 hover:text-primary disabled:opacity-20">
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => move(idx, 1)} disabled={idx === sorted.length - 1 || reordering} title={t('admin.moveDown')} className="h-6 w-6 rounded-md text-muted-foreground/50 hover:text-primary disabled:opacity-20">
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-serif font-bold text-foreground/90 leading-snug">{item.question}</p>
+                      <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed line-clamp-3">{item.answer}</p>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Button variant="ghost" size="icon" onClick={() => startEdit(item)} className="h-8 w-8 rounded-lg text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-all">
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => setPendingDelete(item)} className="h-8 w-8 rounded-lg text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-all">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Content Manager ──────────────────────────────────────────────────────────
 function ContentManager() {
   const { data: contentItems = [], isLoading, refetch } = useListContent();
   const upsert = useUpsertContent();
   const remove = useDeleteContent();
   const { toast } = useToast();
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const [editedItems, setEditedItems] = useState<Record<string, ContentItem>>({});
   const [addingNew, setAddingNew] = useState(false);
   const [newItem, setNewItem] = useState({ label: '', value: '', type: 'text' as const, group: 'Site' });
+  const [pendingDelete, setPendingDelete] = useState<ContentItem | null>(null);
 
   if (isLoading) return <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
 
@@ -945,43 +1234,56 @@ function ContentManager() {
     if (itemsToSave.length === 0) return;
     try {
       await upsert.mutateAsync({ data: { items: itemsToSave } });
-      toast({ title: '✓', description: language === 'AR' ? 'تم الحفظ' : language === 'RU' ? 'Сохранено успешно' : 'Saved successfully' });
+      toast({ title: '✓', description: t('admin.saved') });
       setEditedItems({});
       await refetch();
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('admin.error'), description: error.message, variant: 'destructive' });
     }
   };
 
   const handleAddNew = async () => {
     if (!newItem.label || !newItem.value) {
-      toast({ title: 'Error', description: 'Label and value are required', variant: 'destructive' });
+      toast({ title: t('admin.error'), description: t('admin.faqRequired'), variant: 'destructive' });
       return;
     }
     const key = newItem.group.toLowerCase().replace(/\s+/g, '.') + '.' + newItem.label.toLowerCase().replace(/\s+/g, '_');
     try {
       await upsert.mutateAsync({ data: { items: [{ key, group: newItem.group, label: newItem.label, type: newItem.type, value: newItem.value }] } });
-      toast({ title: '✓' });
+      toast({ title: '✓', description: t('admin.saved') });
       setNewItem({ label: '', value: '', type: 'text', group: 'Site' });
       setAddingNew(false);
       await refetch();
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('admin.error'), description: error.message, variant: 'destructive' });
     }
   };
 
-  const handleDelete = async (key: string) => {
-    if (!confirm(t('admin.delete') + '?')) return;
+  const handleDelete = async () => {
+    if (!pendingDelete) return;
+    const key = pendingDelete.key;
+    setPendingDelete(null);
     try {
       await remove.mutateAsync({ key });
+      toast({ title: '✓', description: t('admin.saved') });
       await refetch();
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: t('admin.error'), description: error.message, variant: 'destructive' });
     }
   };
 
   return (
     <div className="space-y-7">
+      {pendingDelete && (
+        <ConfirmDialog
+          open={!!pendingDelete}
+          title={t('admin.delete')}
+          description={pendingDelete.label || pendingDelete.key}
+          confirmLabel={t('admin.delete')}
+          onConfirm={handleDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <SectionHeader icon={Settings} title={t('admin.contentMgmt')} description={t('admin.contentDesc')} />
         <div className="flex items-center gap-2">
@@ -1086,7 +1388,7 @@ function ContentManager() {
                           <Input value={currentItem.value} onChange={e => handleChange(e.target.value)} className="bg-background/50 text-sm h-9" />
                         )}
                       </div>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(item.key)} className="text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 flex-shrink-0 h-9 w-9 rounded-lg transition-all">
+                      <Button variant="ghost" size="icon" onClick={() => setPendingDelete(item)} className="text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 flex-shrink-0 h-9 w-9 rounded-lg transition-all">
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>

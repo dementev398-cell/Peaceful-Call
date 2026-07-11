@@ -9,6 +9,7 @@ export const appUsersTable = pgTable("app_users", {
   name: text("name").notNull().default(""),
   email: text("email").notNull().default(""),
   avatarUrl: text("avatar_url"),
+  allowDirectMessages: boolean("allow_direct_messages").notNull().default(true),
   updatedAt: timestamp("updated_at", { mode: "string" }).notNull().defaultNow(),
   createdAt: timestamp("created_at", { mode: "string" }).notNull().defaultNow(),
 });

@@ -1,5 +1,6 @@
 export * from "./admins";
 export * from "./content";
+export * from "./faq";
 export * from "./posts";
 export * from "./messages";
 export * from "./chat";

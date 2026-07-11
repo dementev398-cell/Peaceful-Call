@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CommentAvatarDmDialog } from '@/components/CommentAvatarDmDialog';
 
 export default function SinglePostPage() {
   const { slug } = useParams();
@@ -151,7 +152,7 @@ function PostInteractions({ postId }: { postId: number }) {
       toast({ title: '✓', description: isRtl ? 'تم إرسال التعليق' : 'Комментарий отправлен' });
       invalidateInteractions();
     } catch {
-      toast({ title: 'Ошибка', variant: 'destructive' });
+      toast({ title: t('nickname.error'), variant: 'destructive' });
     }
   };
 
@@ -161,7 +162,7 @@ function PostInteractions({ postId }: { postId: number }) {
       await deleteComment.mutateAsync({ id: postId, commentId });
       invalidateInteractions();
     } catch {
-      toast({ title: 'Ошибка', variant: 'destructive' });
+      toast({ title: t('nickname.error'), variant: 'destructive' });
     }
   };
 
@@ -285,12 +286,19 @@ function PostInteractions({ postId }: { postId: number }) {
                   className="glass rounded-2xl border border-border/30 p-5"
                 >
                   <div className="flex items-start gap-3">
-                    <Avatar className="w-10 h-10 border border-border/50 flex-shrink-0">
-                      <AvatarImage src={comment.authorAvatarUrl || ''} />
-                      <AvatarFallback className={`text-sm font-bold ${comment.isAdmin ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                        {comment.authorName.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <CommentAvatarDmDialog
+                      authorClerkId={comment.authorClerkId}
+                      authorName={comment.authorName}
+                      authorAvatarUrl={comment.authorAvatarUrl}
+                      isAdmin={comment.isAdmin}
+                    >
+                      <Avatar className="w-10 h-10 border border-border/50 flex-shrink-0">
+                        <AvatarImage src={comment.authorAvatarUrl || ''} />
+                        <AvatarFallback className={`text-sm font-bold ${comment.isAdmin ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                          {comment.authorName.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    </CommentAvatarDmDialog>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-bold text-sm text-foreground">{comment.authorName}</span>

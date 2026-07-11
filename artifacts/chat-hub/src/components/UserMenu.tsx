@@ -10,27 +10,38 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut, User, Settings } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useGetMyProfile } from '@workspace/api-client-react';
 
 export function UserMenu() {
   const { user } = useUser();
   const { t } = useLanguage();
-  
+  const { data: profile } = useGetMyProfile();
+
   if (!user) return null;
+
+  // Prefer Clerk's full name; fall back to custom nickname; then initial of email
+  const displayName =
+    user.fullName?.trim() ||
+    profile?.nickname?.trim() ||
+    user.primaryEmailAddress?.emailAddress?.split('@')[0] ||
+    '';
+
+  const initial = displayName.charAt(0).toUpperCase() || 'U';
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="outline-none">
         <Avatar className="w-9 h-9 border border-primary/20 hover:border-primary/50 transition-colors">
-          <AvatarImage src={user.imageUrl} alt={user.fullName || ''} />
+          <AvatarImage src={user.imageUrl} alt={displayName} />
           <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-            {user.firstName?.charAt(0) || 'U'}
+            {initial}
           </AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 font-sans border-border/50">
         <div className="p-3">
           <p className="text-sm font-medium leading-none mb-1 text-foreground">
-            {user.fullName}
+            {displayName}
           </p>
           <p className="text-xs text-muted-foreground truncate">
             {user.primaryEmailAddress?.emailAddress}

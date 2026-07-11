@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, sql } from "drizzle-orm";
 import { getAuth, clerkClient } from "@clerk/express";
-import { db, userProfilesTable } from "@workspace/db";
+import { db, userProfilesTable, appUsersTable } from "@workspace/db";
 import { requireAppUser } from "../middlewares/appUser";
 
 const router: IRouter = Router();
@@ -48,7 +48,7 @@ async function generateUniqueFallbackNickname(userId: string): Promise<string> {
   return candidate;
 }
 
-// GET /profile/me — returns current user's profile, creating a default on first access
+// GET /profile/me — returns current user's profile (including allowDirectMessages), creating a default on first access
 router.get("/profile/me", requireAppUser, async (req, res): Promise<void> => {
   const auth = getAuth(req);
   const userId = auth!.userId!;
@@ -58,8 +58,16 @@ router.get("/profile/me", requireAppUser, async (req, res): Promise<void> => {
     .from(userProfilesTable)
     .where(eq(userProfilesTable.clerkUserId, userId));
 
+  // Also fetch allowDirectMessages from appUsersTable
+  const [appUser] = await db
+    .select({ allowDirectMessages: appUsersTable.allowDirectMessages })
+    .from(appUsersTable)
+    .where(eq(appUsersTable.clerkUserId, userId));
+
+  const allowDirectMessages = appUser?.allowDirectMessages ?? true;
+
   if (existing) {
-    res.json(existing);
+    res.json({ ...existing, allowDirectMessages });
     return;
   }
 
@@ -70,17 +78,18 @@ router.get("/profile/me", requireAppUser, async (req, res): Promise<void> => {
     .values({ clerkUserId: userId, nickname })
     .returning();
 
-  res.json(created);
+  res.json({ ...created, allowDirectMessages });
 });
 
-// PATCH /profile/me — update nickname and/or avatarUrl
+// PATCH /profile/me — update nickname, avatarUrl, and/or allowDirectMessages
 router.patch("/profile/me", requireAppUser, async (req, res): Promise<void> => {
   const auth = getAuth(req);
   const userId = auth!.userId!;
 
-  const { nickname, avatarUrl } = req.body as {
+  const { nickname, avatarUrl, allowDirectMessages } = req.body as {
     nickname?: string;
     avatarUrl?: string | null;
+    allowDirectMessages?: boolean;
   };
 
   if (nickname !== undefined && typeof nickname !== "string") {
@@ -89,6 +98,10 @@ router.patch("/profile/me", requireAppUser, async (req, res): Promise<void> => {
   }
   if (nickname !== undefined && nickname.trim().length === 0) {
     res.status(400).json({ error: "nickname cannot be empty" });
+    return;
+  }
+  if (allowDirectMessages !== undefined && typeof allowDirectMessages !== "boolean") {
+    res.status(400).json({ error: "allowDirectMessages must be a boolean" });
     return;
   }
 
@@ -145,8 +158,35 @@ router.patch("/profile/me", requireAppUser, async (req, res): Promise<void> => {
     updates.avatarUrl = avatarUrl ?? null;
   }
 
+  // Handle allowDirectMessages update in appUsersTable (upsert, mirroring JIT-sync pattern)
+  let finalAllowDirectMessages: boolean = true;
+  if (allowDirectMessages !== undefined) {
+    const [upserted] = await db
+      .insert(appUsersTable)
+      .values({
+        clerkUserId: userId,
+        name: req.appUser?.name ?? "",
+        email: req.appUser?.email ?? "",
+        avatarUrl: req.appUser?.avatarUrl ?? null,
+        allowDirectMessages,
+      })
+      .onConflictDoUpdate({
+        target: appUsersTable.clerkUserId,
+        set: { allowDirectMessages, updatedAt: new Date().toISOString() },
+      })
+      .returning({ allowDirectMessages: appUsersTable.allowDirectMessages });
+    finalAllowDirectMessages = upserted?.allowDirectMessages ?? allowDirectMessages;
+  } else {
+    // Fetch current value to include in response
+    const [appUser] = await db
+      .select({ allowDirectMessages: appUsersTable.allowDirectMessages })
+      .from(appUsersTable)
+      .where(eq(appUsersTable.clerkUserId, userId));
+    finalAllowDirectMessages = appUser?.allowDirectMessages ?? true;
+  }
+
   if (Object.keys(updates).length === 0) {
-    res.json(profile);
+    res.json({ ...profile, allowDirectMessages: finalAllowDirectMessages });
     return;
   }
 
@@ -157,7 +197,7 @@ router.patch("/profile/me", requireAppUser, async (req, res): Promise<void> => {
       .where(eq(userProfilesTable.clerkUserId, userId))
       .returning();
 
-    res.json(updated);
+    res.json({ ...updated, allowDirectMessages: finalAllowDirectMessages });
   } catch (err: unknown) {
     // Fallback safety net in case of a race condition past the pre-check above;
     // the DB-level unique constraint on nickname is the ultimate source of truth.
@@ -189,6 +229,19 @@ router.get("/profile/:clerkUserId", async (req, res): Promise<void> => {
   }
 
   res.json(profile);
+});
+
+// GET /users/:clerkUserId/messaging-status — public endpoint for checking if a user allows DMs
+router.get("/users/:clerkUserId/messaging-status", async (req, res): Promise<void> => {
+  const { clerkUserId } = req.params;
+
+  const [appUser] = await db
+    .select({ allowDirectMessages: appUsersTable.allowDirectMessages })
+    .from(appUsersTable)
+    .where(eq(appUsersTable.clerkUserId, clerkUserId as string));
+
+  // If user doesn't exist in app_users yet, default to allowing DMs
+  res.json({ allowDirectMessages: appUser?.allowDirectMessages ?? true });
 });
 
 export default router;
