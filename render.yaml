@@ -19,7 +19,6 @@ services:
     region: frankfurt
     plan: starter
     buildCommand: >
-      corepack enable &&
       pnpm install --frozen-lockfile &&
       pnpm --filter @workspace/api-server run build
     startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
@@ -76,7 +75,6 @@ services:
     runtime: static
     region: frankfurt
     buildCommand: >
-      corepack enable &&
       pnpm install --frozen-lockfile &&
       pnpm --filter @workspace/chat-hub run build
     staticPublishPath: artifacts/chat-hub/dist/public
