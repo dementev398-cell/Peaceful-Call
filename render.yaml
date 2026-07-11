@@ -58,9 +58,10 @@ services:
         sync: false
       - key: S3_BUCKET
         sync: false
-      # Optional: S3-compatible endpoint (leave unset for AWS S3).
-      # - key: S3_ENDPOINT
-      #   sync: false
+      # S3-compatible endpoint. Required for R2/B2; leave unset for AWS S3.
+      # Example for Cloudflare R2: https://<account_id>.r2.cloudflarestorage.com
+      - key: S3_ENDPOINT
+        sync: false
       - key: PUBLIC_OBJECT_SEARCH_PATHS
         sync: false
       - key: PRIVATE_OBJECT_DIR
