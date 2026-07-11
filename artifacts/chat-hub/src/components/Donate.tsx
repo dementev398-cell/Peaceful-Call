@@ -133,16 +133,21 @@ export function Donate() {
                     </div>
 
                     {/* Primary CTA */}
-                    <a
-                      href="https://new.donatepay.ru/@PeacefulCall"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group inline-flex items-center justify-center gap-3 px-10 py-4 rounded-full bg-primary text-primary-foreground font-bold text-sm md:text-base uppercase tracking-widest transition-all glow-gold shadow-[0_8px_28px_hsl(43_85%_58%/0.35)] hover:shadow-[0_12px_36px_hsl(43_85%_58%/0.5)] hover:brightness-110 hover:scale-[1.03] active:scale-[0.98] w-full sm:w-auto"
-                    >
-                      <Heart className="w-4 h-4 fill-current opacity-80" />
-                      {t('support.button')}
-                      <ExternalLink className="w-3.5 h-3.5 opacity-70 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                    </a>
+                    <div className="flex flex-col items-center md:items-start gap-2 w-full sm:w-auto">
+                      <p className="text-[0.65rem] text-muted-foreground/50 font-medium tracking-wide">
+                        {t('support.otherMethods')}
+                      </p>
+                      <a
+                        href="https://new.donatepay.ru/@PeacefulCall"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group inline-flex items-center justify-center gap-3 px-10 py-4 rounded-full bg-primary text-primary-foreground font-bold text-sm md:text-base uppercase tracking-widest transition-all glow-gold shadow-[0_8px_28px_hsl(43_85%_58%/0.35)] hover:shadow-[0_12px_36px_hsl(43_85%_58%/0.5)] hover:brightness-110 hover:scale-[1.03] active:scale-[0.98] w-full sm:w-auto"
+                      >
+                        <Heart className="w-4 h-4 fill-current opacity-80" />
+                        {t('support.button')}
+                        <ExternalLink className="w-3.5 h-3.5 opacity-70 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                      </a>
+                    </div>
 
                     {/* Accepted currencies note */}
                     <div className="flex items-center gap-2">

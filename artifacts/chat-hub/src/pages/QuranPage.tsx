@@ -196,7 +196,7 @@ export default function QuranPage() {
 
           {/* Controls */}
           <ScrollReveal delay="100">
-            <div className="sticky top-20 z-20 mb-8 grid sm:grid-cols-2 gap-3 p-3 rounded-2xl glass-strong border border-border/40 shadow-lg overflow-hidden">
+            <div className="sticky top-20 z-20 mb-8 grid sm:grid-cols-2 gap-3 p-3 rounded-2xl glass-strong border border-border/40 shadow-lg">
               <div className="min-w-0">
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 px-1">
                   {t('quran.selectSurah')}
